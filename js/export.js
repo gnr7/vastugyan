@@ -9,6 +9,7 @@ import {
   calculateGateAssessment,
   calculatePositiveLandEnergy,
   calculate16BarChart,
+  calculateVithiSummary,
   formatArea,
   formatLength
 } from './analysis.js';
@@ -92,6 +93,7 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
   const gateData = calculateGateAssessment(state.metrics.entranceGates32);
   const landData = calculatePositiveLandEnergy(state.metrics, cal);
   const barChart = calculate16BarChart(state.metrics.zones16);
+  const vithiData = calculateVithiSummary(state.metrics.vithi);
   const totalPages = barChart.hasData ? 3 : 2;
 
   // Palette constants
@@ -344,6 +346,39 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
   doc.text('• 4 Cardinal Inner Devtas: Aryama (East, 6 padas), Vivaswan (South, 6 padas), Mitra (West, 6 padas), Bhudhar (North, 6 padas).', 14, yPos + 5);
   doc.text('• 8 Diagonal Inner Devtas: Aapa/Aapavatsa (NE), Savita/Savitra (SE), Indra/Jaya (SW), Rudra/Rajayakshma (NW) (2 padas each).', 14, yPos + 10);
   doc.text('• 32 Perimeter Devtas: 1 pada each along all 4 perimeter edges forming the 32 Gateway matrix.', 14, yPos + 15);
+
+  // Section 4: Vithi Mandal (share of the real plot in each ring)
+  if (vithiData.hasData) {
+    yPos += 25;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(...darkCharcoal);
+    doc.text('4. Vithi Mandal (Four Rings of the 81 Padas)', 14, yPos);
+    yPos += 5;
+    const ringRgb = { brahma: [179, 38, 30], daivika: [176, 141, 60], manushya: [62, 142, 94], paishachika: [110, 91, 74] };
+    vithiData.rings.forEach((ring) => {
+      doc.setFillColor(...lightBg);
+      doc.rect(14, yPos, 182, 10.5, 'F');
+      doc.setFillColor(...ringRgb[ring.id]);
+      doc.rect(14, yPos, 2.2, 10.5, 'F');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(...darkCharcoal);
+      doc.text(ring.name, 19, yPos + 4.3);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${ring.padas} padas`, 52, yPos + 4.3);
+      doc.text(formatArea(ring.area, cal), 80, yPos + 4.3);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${ring.areaPct.toFixed(1)}% of plot`, 196, yPos + 4.3, { align: 'right' });
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(...mediumGray);
+      doc.text(ring.guidance, 19, yPos + 8.6);
+      yPos += 11.5;
+    });
+  }
 
   // Page 2 Footer
   doc.setFontSize(8);

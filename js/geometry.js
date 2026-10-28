@@ -360,6 +360,64 @@ export const nearestWallAlignedAngle = (wallAngleDeg, northDeg) => {
   return best;
 };
 
+// The four Vithis of the 81-pada mandala as nested squares on the 9×9 grid (in pada units)
+export const VITHI_RINGS = [
+  { id: 'brahma', outer: [3, 6], inner: null, padas: 9 },
+  { id: 'daivika', outer: [2, 7], inner: [3, 6], padas: 16 },
+  { id: 'manushya', outer: [1, 8], inner: [2, 7], padas: 24 },
+  { id: 'paishachika', outer: [0, 9], inner: [1, 8], padas: 32 }
+];
+
+// World position of a grid point (col, row in pada units, 0–9) on the rotated 9×9 grid
+const gridPointToWorld = (grid9x9, col, row) => {
+  const [o0, o1, , o3] = grid9x9.outerBox;
+  return {
+    x: o0.x + ((o1.x - o0.x) * col) / 9 + ((o3.x - o0.x) * row) / 9,
+    y: o0.y + ((o1.y - o0.y) * col) / 9 + ((o3.y - o0.y) * row) / 9
+  };
+};
+
+const gridSquare = (grid9x9, [lo, hi]) => [
+  gridPointToWorld(grid9x9, lo, lo),
+  gridPointToWorld(grid9x9, hi, lo),
+  gridPointToWorld(grid9x9, hi, hi),
+  gridPointToWorld(grid9x9, lo, hi)
+];
+
+/**
+ * Vithi Mandal: the four concentric rings of the 9×9 grid, with the real plot area in each.
+ * A ring's area is the plot clipped to its outer square minus the plot clipped to its inner one.
+ * @param {Object} grid9x9 - Result of generate9x9VastuGrid
+ * @param {Array} points - Closed plot polygon in world coordinates
+ */
+export const calculateVithiMandal = (grid9x9, points) => {
+  if (!grid9x9 || !grid9x9.outerBox || !points || points.length < 3) return null;
+  const plotArea = calculatePolygonArea(points);
+  const areaInside = (square) => calculatePolygonArea(clipPolygonByConvex(points, square));
+
+  const rings = VITHI_RINGS.map((ring) => {
+    const outer = gridSquare(grid9x9, ring.outer);
+    const inner = ring.inner ? gridSquare(grid9x9, ring.inner) : null;
+    const area = Math.max(0, areaInside(outer) - (inner ? areaInside(inner) : 0));
+    const ringGridArea = calculatePolygonArea(outer) - (inner ? calculatePolygonArea(inner) : 0);
+    return {
+      ...ring,
+      outerCorners: outer,
+      innerCorners: inner,
+      area,
+      areaPct: plotArea > 0 ? (area / plotArea) * 100 : 0,
+      // How much of the ring the plot actually fills (below 100% where the plot has cuts)
+      fillPct: ringGridArea > 0 ? (area / ringGridArea) * 100 : 0,
+      // Label anchor: middle of the ring's top band (the Brahma label sits in its centre)
+      labelPoint: ring.inner
+        ? gridPointToWorld(grid9x9, 4.5, (ring.outer[0] + ring.inner[0]) / 2)
+        : gridPointToWorld(grid9x9, 4.5, ring.outer[0] + 0.45)
+    };
+  });
+
+  return { rings, plotArea, angleDeg: grid9x9.angleDeg };
+};
+
 // Find closest vertex within a screen pixel tolerance radius
 export const findClosestVertex = (worldPoint, vertices, toleranceWorld) => {
   if (!vertices || vertices.length === 0) return -1;

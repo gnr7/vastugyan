@@ -39,6 +39,12 @@
   --el-earth: #B8862B;
   --el-space: #7D7590;
 
+  /* Vithi rings (match the canvas tints) */
+  --vithi-brahma: #B3261E;
+  --vithi-daivika: #B08D3C;
+  --vithi-manushya: #3E8E5E;
+  --vithi-paishachika: #6E5B4A;
+
   /* Type */
   --font-display: 'Marcellus', 'Cormorant Garamond', Georgia, serif;
   --font-body: 'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -95,6 +101,10 @@
     --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow-2: 0 12px 32px rgba(0, 0, 0, 0.5);
     --shadow-sheet: 0 -12px 40px rgba(0, 0, 0, 0.55);
+    --vithi-brahma: #E0645A;
+    --vithi-daivika: #D1B062;
+    --vithi-manushya: #6CC08C;
+    --vithi-paishachika: #A8977F;
     color-scheme: dark;
   }
 }
@@ -521,6 +531,30 @@ button:disabled { cursor: default; opacity: 0.38; }
 .elem-name { font-weight: 600; }
 .elem-zones { font-size: 12px; color: var(--muted); text-align: right; }
 .elem-pct { font-weight: 700; text-align: right; }
+
+/* Vithi mandal */
+.vithi-list { display: grid; gap: 8px; }
+.vithi-row {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  grid-template-areas: "sw head pct" "sw meta meta" "sw guide guide";
+  column-gap: 10px; row-gap: 2px;
+  padding: 12px 14px 12px 12px;
+  border-radius: var(--r-md);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+}
+.vithi-swatch { grid-area: sw; width: 14px; border-radius: 4px; opacity: 0.85; }
+.vithi-brahma { background: var(--vithi-brahma); }
+.vithi-daivika { background: var(--vithi-daivika); }
+.vithi-manushya { background: var(--vithi-manushya); }
+.vithi-paishachika { background: var(--vithi-paishachika); }
+.vithi-head { grid-area: head; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.vithi-name { font-family: var(--font-display); font-size: 17px; color: var(--ink); }
+.vithi-sanskrit { font-size: 13px; color: var(--brass); }
+.vithi-pct { grid-area: pct; font-size: 16px; font-weight: 700; color: var(--ink); align-self: center; }
+.vithi-meta { grid-area: meta; font-size: 12.5px; color: var(--muted); }
+.vithi-guide { grid-area: guide; font-size: 13px; color: var(--ink-2); margin-top: 4px; line-height: 1.4; }
 
 /* Gates */
 .gate-assessment-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }

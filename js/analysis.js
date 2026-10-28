@@ -367,3 +367,55 @@ export const calculatePositiveLandEnergy = (metrics, calibration = null) => {
   };
 };
 
+
+/**
+ * Vithi Mandal: the four concentric rings of the 81-pada mandala and their traditional use
+ */
+export const VITHI_DATA = {
+  brahma: {
+    name: 'Brahma',
+    sanskrit: 'ब्रह्म',
+    color: 'var(--vithi-brahma)',
+    guidance: 'The sacred centre. Keep it open and light, free of pillars, walls, toilets and heavy loads.'
+  },
+  daivika: {
+    name: 'Daivika',
+    sanskrit: 'दैविक',
+    color: 'var(--vithi-daivika)',
+    guidance: 'Ring of the devas. Suits prayer, quiet sitting and light, open use.'
+  },
+  manushya: {
+    name: 'Manushya',
+    sanskrit: 'मानुष',
+    color: 'var(--vithi-manushya)',
+    guidance: 'Ring of people. The natural place for living, dining, bedrooms and daily life.'
+  },
+  paishachika: {
+    name: 'Paishachika',
+    sanskrit: 'पैशाचिक',
+    color: 'var(--vithi-paishachika)',
+    guidance: 'The outer ring. Traditionally for boundary walls, storage, stairs and service rooms.'
+  }
+};
+
+/**
+ * Pure summary of the Vithi Mandal for the panel and the PDF
+ * @param {Object} vithi - Result of calculateVithiMandal (metrics.vithi)
+ */
+export const calculateVithiSummary = (vithi = null) => {
+  const rings = vithi && vithi.rings ? vithi.rings : [];
+  return {
+    hasData: rings.length === 4 && vithi.plotArea > 0,
+    rings: ['brahma', 'daivika', 'manushya', 'paishachika'].map((id) => {
+      const ring = rings.find((r) => r.id === id);
+      return {
+        id,
+        ...VITHI_DATA[id],
+        padas: ring ? ring.padas : { brahma: 9, daivika: 16, manushya: 24, paishachika: 32 }[id],
+        area: ring ? ring.area : 0,
+        areaPct: ring ? ring.areaPct : 0,
+        fillPct: ring ? ring.fillPct : 0
+      };
+    })
+  };
+};

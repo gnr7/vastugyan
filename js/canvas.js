@@ -273,6 +273,68 @@ export const drawCentroidMarker = (ctx, centroid, scale) => {
 };
 
 // Render 9x9 Vastu Purusha Mandala Grid and Brahmasthan
+// Vithi Mandal ring colours: sacred centre to the outer, worldly ring
+const VITHI_STYLE = {
+  brahma: { fill: 'rgba(179, 38, 30, 0.16)', stroke: 'rgba(179, 38, 30, 0.75)', label: 'Brahma' },
+  daivika: { fill: 'rgba(176, 141, 60, 0.18)', stroke: 'rgba(150, 118, 44, 0.8)', label: 'Daivika' },
+  manushya: { fill: 'rgba(62, 142, 94, 0.13)', stroke: 'rgba(47, 122, 75, 0.75)', label: 'Manushya' },
+  paishachika: { fill: 'rgba(91, 74, 59, 0.12)', stroke: 'rgba(91, 74, 59, 0.6)', label: 'Paishachika' }
+};
+
+// Render the Vithi Mandal: four concentric rings with a name on each ring's top band
+export const drawVithiMandal = (ctx, vithi, scale, layers) => {
+  if (!vithi || !layers.vithi) return;
+  const angleRad = ((vithi.angleDeg || 0) * Math.PI) / 180;
+  const tracePath = (corners) => {
+    ctx.moveTo(corners[0].x, corners[0].y);
+    corners.slice(1).forEach((p) => ctx.lineTo(p.x, p.y));
+    ctx.closePath();
+  };
+
+  ctx.save();
+  vithi.rings.forEach((ring) => {
+    const style = VITHI_STYLE[ring.id];
+    ctx.beginPath();
+    tracePath(ring.outerCorners);
+    if (ring.innerCorners) tracePath(ring.innerCorners);
+    ctx.fillStyle = style.fill;
+    ctx.fill('evenodd');
+    ctx.beginPath();
+    tracePath(ring.outerCorners);
+    ctx.strokeStyle = style.stroke;
+    ctx.lineWidth = 1.6 / scale;
+    ctx.setLineDash([]);
+    ctx.stroke();
+  });
+
+  const fontPx = Math.max(10, Math.min(13, 12 / Math.sqrt(scale)));
+  vithi.rings.forEach((ring) => {
+    const style = VITHI_STYLE[ring.id];
+    ctx.save();
+    ctx.translate(ring.labelPoint.x, ring.labelPoint.y);
+    ctx.rotate(angleRad);
+    ctx.scale(1 / scale, 1 / scale);
+    ctx.font = `600 ${fontPx}px 'Hanken Grotesk', sans-serif`;
+    const text = style.label;
+    const w = ctx.measureText(text).width + 12;
+    const h = fontPx + 6;
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') ctx.roundRect(-w / 2, -h / 2, w, h, h / 2);
+    else ctx.rect(-w / 2, -h / 2, w, h);
+    ctx.fillStyle = 'rgba(255, 252, 246, 0.94)';
+    ctx.fill();
+    ctx.strokeStyle = style.stroke;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = '#2A1F17';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 0, 0.5);
+    ctx.restore();
+  });
+  ctx.restore();
+};
+
 export const draw9x9Grid = (ctx, grid9x9, scale, layers) => {
   if (!grid9x9 || !grid9x9.padas || grid9x9.padas.length === 0) return;
 
@@ -1351,6 +1413,11 @@ export class CanvasController {
     // 5. Render 16 Directional Zones Overlay (Sector fills, 22.5° rays, zone labels)
     if (state.metrics.zones16) {
       draw16Zones(ctx, state.metrics.zones16, state.viewport.scale, state.layers);
+    }
+
+    // 5b. Vithi Mandal rings (under the grid lines)
+    if (state.metrics.vithi) {
+      drawVithiMandal(ctx, state.metrics.vithi, state.viewport.scale, state.layers);
     }
 
     // 6. Render 9x9 Vastu grid & Brahmasthan overlay

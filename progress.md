@@ -171,6 +171,14 @@ Open-source, local-first Vastu Shastra analysis web application inspired by prof
   - **Sharing**: PDF, plan image and bar chart go to the phone's share sheet on touch devices and download elsewhere. **Take photo** opens the camera for a printed plan.
   - Fixes found on the way: the start screen no longer reappears after "Use Blank Canvas"; fit-to-view handles plots that don't start at (0, 0) and keeps clear of the dock and sheet; the wide-layout canvas no longer grows taller than the window.
 
+- [x] **New Feature: Vithi Mandal** (COMPLETED, 2026-10-28)
+  - The four concentric rings of the 81-pada mandala on the 9×9 grid: **Brahma** (centre 3×3, 9 padas), **Daivika** (16), **Manushya** (24), **Paishachika** (outer ring, 32). `VITHI_RINGS` and `calculateVithiMandal` are in [`js/geometry.js`](js/geometry.js) and stored as `metrics.vithi`. Rings follow the grid in both alignment modes.
+  - Each ring's area is the real plot clipped to its outer square minus its inner square, so the four areas always sum to the plot area. `fillPct` shows how much of a ring the plot actually fills, which flags cuts (an L-shape notch reaching into Brahma shows "plot fills 94% of the ring").
+  - Canvas: `drawVithiMandal` draws soft ring tints (kumkum, brass, tulsi green, earth) under the grid lines, with a name pill on each ring's top band that rotates with the grid. Turned on by the new **Vithi mandal** tile in Layers.
+  - Analysis card: each ring shows its Sanskrit name, share of the plot, padas, real area (sq ft / sq m once Set Scale is applied) and short traditional guidance (keep Brahma open; Paishachika for boundary walls, storage, stairs and service rooms). `VITHI_DATA` and `calculateVithiSummary` are in [`js/analysis.js`](js/analysis.js).
+  - PDF: section 4 on page 2 lists the four rings with padas, area, share and guidance.
+  - Tests: 4 new assertions (29 total). A square plot gives exactly 9/16/24/32 padas; ring areas sum to the plot for an L-shape at any rotation in both grid modes; the L-shape's cut shows as a partly filled outer ring.
+
 ---
 
 ## Current Status
@@ -191,6 +199,7 @@ Open-source, local-first Vastu Shastra analysis web application inspired by prof
   14. Gap fixes: Set Scale & real units, real-area Panch Tatva, angular 32 entrances on real walls, grid alignment toggle, rename
   15. 16 Direction Bar Chart (popup with Export PNG + PDF page 3)
   16. Mobile & tablet app redesign (touch, bottom sheet, compass dial, ivory & saffron, offline install, autosave, share)
-- **Awaiting User Review & Approval** before proceeding to the next feature (Vithi Mandal).
+  17. Vithi Mandal (4 rings with real-area shares, guidance, canvas overlay, PDF section)
+- All features from the original wish list are built. **Awaiting user review** before anything further.
 
 

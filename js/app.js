@@ -26,6 +26,7 @@ import {
   calculatePositiveLandEnergy,
   calculatePanchTatvaSummary,
   calculate16BarChart,
+  calculateVithiSummary,
   formatArea,
   formatLength
 } from './analysis.js';
@@ -112,6 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
     zones16: document.getElementById('toggleZones16'),
     gates32: document.getElementById('toggleGates32'),
     marma: document.getElementById('toggleMarma'),
+    vithi: document.getElementById('toggleVithi'),
     elements: document.getElementById('toggleElements')
   };
 
@@ -594,6 +596,18 @@ document.addEventListener('DOMContentLoaded', () => {
         : (areaData.hasClosedPlot ? 'Set scale' : `N ${Math.round(state.rotation)}°`);
       sumVerdict.className = `summary-chip ${land.isActive ? ({ RECOMMENDED: 'is-good', MODERATE: 'is-mid', CAUTION: 'is-bad' }[code] || '') : ''}`;
     }
+
+    // Vithi Mandal: share of the real plot in each ring
+    const vithiSummary = calculateVithiSummary(state.metrics.vithi);
+    vithiSummary.rings.forEach((ring) => {
+      const row = document.querySelector(`[data-vithi="${ring.id}"]`);
+      if (!row) return;
+      row.querySelector('[data-vithi-pct]').textContent = vithiSummary.hasData ? `${ring.areaPct.toFixed(1)}%` : '—';
+      const filled = ring.fillPct < 99.5 ? ` · plot fills ${Math.round(ring.fillPct)}% of the ring` : '';
+      row.querySelector('[data-vithi-meta]').textContent = vithiSummary.hasData
+        ? `${ring.padas} padas · ${formatArea(ring.area, cal)}${filled}`
+        : `${ring.padas} padas`;
+    });
 
     // Update Panch Tatva balance from the real plot area in each element's zones
     calculatePanchTatvaSummary(state.metrics.zones16).forEach((elem) => {

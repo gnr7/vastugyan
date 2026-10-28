@@ -4,6 +4,7 @@ import {
   calculateBoundingBox,
   generate9x9VastuGrid,
   calculateMarmaSthan,
+  calculateVithiMandal,
   calculatePlotOrientation,
   nearestWallAlignedAngle,
   distance
@@ -42,6 +43,7 @@ export const createInitialState = () => Object.freeze({
     zones16: false,
     gates32: false,
     marma: false,
+    vithi: false,
     elements: false
   }),
   metrics: Object.freeze({
@@ -53,6 +55,7 @@ export const createInitialState = () => Object.freeze({
     zones16: null,            // 16 Directional Zones
     entranceGates32: null,    // 32 Perimeter Entrance Gates
     marmaSthan: null,         // Marma Sthan diagonal lines and nodes
+    vithi: null,              // Vithi Mandal: 4 concentric rings with real plot area
     gridAngle: 0              // angle the 9x9 grid is laid at (North rotation or wall-aligned)
   }),
   history: Object.freeze({
@@ -139,6 +142,7 @@ export const recalculateMetrics = (points, isClosed, rotation = 0, gridAlign = '
       zones16: null,
       entranceGates32: null,
       marmaSthan: null,
+      vithi: null,
       gridAngle: rotation
     });
   }
@@ -161,6 +165,7 @@ export const recalculateMetrics = (points, isClosed, rotation = 0, gridAlign = '
     ? calculate32EntranceGates(points, centroid, rotation, devtaFields)
     : null;
   const marmaSthan = (hasPlot && centroid) ? calculateMarmaSthan(points, centroid, gridAngle) : null;
+  const vithi = grid9x9 ? calculateVithiMandal(grid9x9, points) : null;
 
   return Object.freeze({
     area,
@@ -171,6 +176,7 @@ export const recalculateMetrics = (points, isClosed, rotation = 0, gridAlign = '
     zones16,
     entranceGates32,
     marmaSthan,
+    vithi,
     gridAngle
   });
 };

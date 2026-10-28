@@ -15,7 +15,7 @@ import {
   setGridAlign,
   setRotation
 } from '../js/state.js';
-import { calculatePanchTatvaSummary, calculatePositiveLandEnergy, calculate16BarChart, formatArea } from '../js/analysis.js';
+import { calculatePanchTatvaSummary, calculatePositiveLandEnergy, calculate16BarChart, calculateVithiSummary, formatArea } from '../js/analysis.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps * Math.max(1, Math.abs(a), Math.abs(b));
 let passed = 0;
@@ -210,6 +210,38 @@ test('L-shape (notch in the SE) has its smallest share in a south-east zone', ()
 test('no chart data before the plot is closed', () => {
   assert.equal(calculate16BarChart(recalculateMetrics(rect, false, 0).zones16).hasData, false);
   assert.equal(calculate16BarChart(null).hasData, false);
+});
+
+console.log('Vithi Mandal');
+test('square plot: rings hold exactly 9, 16, 24 and 32 padas of area', () => {
+  const sq = [{ x: 0, y: 0 }, { x: 900, y: 0 }, { x: 900, y: 900 }, { x: 0, y: 900 }];
+  const rings = recalculateMetrics(sq, true, 0).vithi.rings;
+  const pada = 810000 / 81;
+  assert.deepEqual(rings.map((r) => r.id), ['brahma', 'daivika', 'manushya', 'paishachika']);
+  [9, 16, 24, 32].forEach((n, i) => assert.ok(near(rings[i].area / pada, n), `${rings[i].id}: ${rings[i].area / pada}`));
+  rings.forEach((r) => assert.ok(near(r.fillPct, 100)));
+});
+test('ring areas add up to the plot area (L-shape, any rotation, both grid modes)', () => {
+  for (const rot of [0, 23, 140]) {
+    for (const align of ['north', 'walls']) {
+      const m = recalculateMetrics(lShape, true, rot, align);
+      const sum = m.vithi.rings.reduce((s, r) => s + r.area, 0);
+      assert.ok(near(sum, calculatePolygonArea(lShape)), `${rot}° ${align}: ${sum}`);
+      assert.ok(near(m.vithi.rings.reduce((s, r) => s + r.areaPct, 0), 100));
+    }
+  }
+});
+test('L-shape cut shows up as a partly filled outer ring', () => {
+  const rings = recalculateMetrics(lShape, true, 0).vithi.rings;
+  const outer = rings.find((r) => r.id === 'paishachika');
+  assert.ok(outer.fillPct < 100 && outer.fillPct > 50, `fill ${outer.fillPct}`);
+});
+test('Vithi summary carries names, padas and guidance; empty before closing', () => {
+  const summary = calculateVithiSummary(recalculateMetrics(lShape, true, 0).vithi);
+  assert.equal(summary.hasData, true);
+  assert.deepEqual(summary.rings.map((r) => r.padas), [9, 16, 24, 32]);
+  assert.ok(summary.rings.every((r) => r.guidance.length > 20));
+  assert.equal(calculateVithiSummary(recalculateMetrics(lShape, false, 0).vithi).hasData, false);
 });
 
 console.log(`\nAll ${passed} tests passed.`);
