@@ -1300,21 +1300,30 @@ export class CanvasController {
     const state = this.store.getState();
     let contentW = 800;
     let contentH = 600;
+    let originX = 0;
+    let originY = 0;
 
     if (state.image) {
       contentW = state.image.width;
       contentH = state.image.height;
     } else if (state.metrics.bounds) {
+      // A hand-drawn plot can sit anywhere in world space, not just from (0, 0)
       contentW = state.metrics.bounds.width || 800;
       contentH = state.metrics.bounds.height || 600;
+      originX = state.metrics.bounds.minX;
+      originY = state.metrics.bounds.minY;
     }
 
-    const newViewport = computeFitViewport(contentW, contentH, this.width, this.height, 40);
+    // Keep the plan clear of overlays that sit on top of the canvas (phone dock and sheet)
+    const insetBottom = typeof this.getBottomInset === 'function' ? this.getBottomInset() : 0;
+    const fit = computeFitViewport(contentW, contentH, this.width, Math.max(120, this.height - insetBottom), 40);
     this.store.setState((prev) => ({
       ...prev,
       viewport: {
         ...prev.viewport,
-        ...newViewport
+        scale: fit.scale,
+        x: fit.x - originX * fit.scale,
+        y: fit.y - originY * fit.scale
       }
     }));
   }

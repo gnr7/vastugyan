@@ -18,7 +18,8 @@ import {
   setCalibrationMode,
   applyCalibration
 } from './state.js';
-import { CanvasController, computeFitViewport } from './canvas.js';
+import { CanvasController, computeFitViewport, refreshTheme } from './canvas.js';
+import { initUI } from './ui.js';
 import {
   calculateAreaMetrics,
   calculatePositiveLandEnergy,
@@ -35,7 +36,25 @@ document.addEventListener('DOMContentLoaded', () => {
   const store = createStore(createInitialState());
   window.store = store;
   const canvasElement = document.getElementById('vastuCanvas');
+  refreshTheme();
   const canvasController = new CanvasController(canvasElement, store);
+  const ui = initUI(store);
+  canvasController.getBottomInset = () => {
+    if (ui.isWide()) return 96; // floating dock pill
+    const stage = viewportContainer.getBoundingClientRect();
+    const panelTop = document.getElementById('panel').getBoundingClientRect().top;
+    const dockTop = document.getElementById('dock').getBoundingClientRect().top;
+    return Math.max(0, stage.bottom - Math.min(panelTop, dockTop));
+  };
+  let lastState = store.getState();
+  // The start screen shows until the person picks a plan, a blank canvas, or starts drawing
+  let workspaceStarted = false;
+
+  // Re-read canvas colours when the system switches between light and dark
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    refreshTheme();
+    canvasController.render(store.getState());
+  });
 
   // 2. Cache DOM Elements
   const fileInput = document.getElementById('fileInput');
@@ -57,7 +76,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const rotationNumber = document.getElementById('rotationNumber');
   const rotationBadge = document.getElementById('rotationBadge');
   const btnResetRotation = document.getElementById('btnResetRotation');
-  const compassDial = document.getElementById('compassDial');
   const compassDegDisplay = document.getElementById('compassDegDisplay');
   const toggleGridWalls = document.getElementById('toggleGridWalls');
 
@@ -115,7 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // 3. File Upload Handler (Functional using modern Fetch API / FileReader)
   const handleImageFile = async (file) => {
     if (!file || !file.type.startsWith('image/')) {
-      alert('Please select a valid image file (PNG, JPG, WebP).');
+      ui.showToast('Choose a PNG, JPG or WebP image');
       return;
     }
 
@@ -127,24 +145,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const img = new Image();
       img.onload = () => {
+        workspaceStarted = true;
         store.setState(setFloorPlanImage(img, { name: file.name, size: file.size }));
-        emptyState.style.display = 'none';
         canvasController.fitToView();
+        ui.showToast('Floor plan added — tap Draw to trace the boundary');
         URL.revokeObjectURL(objectUrl);
       };
       img.src = URL.createObjectURL(blob);
     } catch (err) {
       console.error('Error loading floor plan image:', err);
-      alert('Failed to load the selected image file.');
+      ui.showToast("That image couldn't be opened. Try another file.");
     }
   };
 
+  const cameraInput = document.getElementById('cameraInput');
   btnUpload.addEventListener('click', () => fileInput.click());
-  fileInput.addEventListener('change', (e) => {
+  document.querySelectorAll('[data-action="upload"]').forEach((b) => b.addEventListener('click', () => fileInput.click()));
+  document.querySelectorAll('[data-action="camera"]').forEach((b) => b.addEventListener('click', () => cameraInput.click()));
+  [fileInput, cameraInput].forEach((input) => input.addEventListener('change', (e) => {
     if (e.target.files && e.target.files[0]) {
       handleImageFile(e.target.files[0]);
     }
-  });
+    e.target.value = '';
+  }));
 
   // Drag and drop image upload
   viewportContainer.addEventListener('dragover', (e) => {
@@ -168,10 +191,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Blank canvas mode
+  // Blank canvas mode: go straight to tracing
   btnBlankCanvas.addEventListener('click', () => {
-    emptyState.style.display = 'none';
+    workspaceStarted = true;
     canvasController.fitToView();
+    store.setState(setDrawingMode(true));
   });
 
   // 4. Viewport Zoom Buttons
@@ -226,7 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnSetScale) {
     btnSetScale.addEventListener('click', () => {
       const state = store.getState();
-      emptyState.style.display = 'none';
+      workspaceStarted = true;
       store.setState(setCalibrationMode(!state.isCalibrating));
     });
   }
@@ -294,7 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const state = store.getState();
     const nextDrawing = !state.isDrawingPolygon;
     if (nextDrawing) {
-      emptyState.style.display = 'none';
+      workspaceStarted = true;
     }
     store.setState(setDrawingMode(nextDrawing));
   });
@@ -331,6 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (btnResetAll) {
     btnResetAll.addEventListener('click', () => {
+      workspaceStarted = false;
       store.setState(resetAll());
       setTimeout(() => canvasController.fitToView(), 50);
     });
@@ -429,25 +454,21 @@ document.addEventListener('DOMContentLoaded', () => {
     zoomLevelText.textContent = `${zoomPct}%`;
 
     // Sync Drawing Mode Button & Banner
-    if (state.isDrawingPolygon) {
-      btnDrawPolygon.classList.add('active');
-      btnDrawPolygon.innerHTML = `
-        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="20 6 9 17 4 12"/>
-        </svg>
-        Done Drawing
-      `;
-      if (draftingBanner) draftingBanner.style.display = 'flex';
-    } else {
-      btnDrawPolygon.classList.remove('active');
-      btnDrawPolygon.innerHTML = `
-        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon points="12 2 22 8.5 17 21 7 21 2 8.5 12 2"/>
-        </svg>
-        Draw Boundary
-      `;
-      if (draftingBanner) draftingBanner.style.display = 'none';
+    btnDrawPolygon.classList.toggle('active', state.isDrawingPolygon);
+    btnDrawPolygon.querySelector('.dock-label').textContent = state.isDrawingPolygon ? 'Done' : 'Draw';
+    if (draftingBanner) draftingBanner.style.display = state.isDrawingPolygon ? 'flex' : 'none';
+
+    // Shell: compass dials, sheet out of the way while a tool is active
+    ui.sync(state);
+
+    // Moments worth confirming
+    if (state.isPolygonClosed && !lastState.isPolygonClosed && state.polygon.length >= 3) {
+      ui.showToast(state.calibration ? 'Boundary closed — open Analysis for the reading' : 'Boundary closed — set the scale for real dimensions');
     }
+    if (state.calibration && state.calibration !== lastState.calibration) {
+      ui.showToast(`Scale set: ${state.calibration.realLength} ${state.calibration.unit} reference`);
+    }
+    lastState = state;
 
     // Sync Rotation values and compass dial
     const deg = state.rotation;
@@ -481,7 +502,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (document.activeElement !== rotationNumber) {
       rotationNumber.value = Math.round(deg * 10) / 10;
     }
-    compassDial.style.transform = `rotate(${-deg}deg)`;
 
     // Sync Layer checkboxes
     Object.entries(toggles).forEach(([layerKey, checkbox]) => {
@@ -503,7 +523,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Sync emptyState overlay
     if (emptyState) {
-      emptyState.style.display = (!state.image && state.polygon.length === 0) ? 'flex' : 'none';
+      emptyState.style.display = (!workspaceStarted && !state.image && state.polygon.length === 0) ? 'flex' : 'none';
     }
 
     // Update Live Metrics & Analysis (real units once Set Scale is applied)
@@ -547,6 +567,23 @@ document.addEventListener('DOMContentLoaded', () => {
         ? `Scale set: 1 ${cal.unit} = ${(1 / cal.realPerWorld).toFixed(2)} px on the plan`
         : 'Scale not set — use Set Scale for real feet / metres';
       valScale.classList.toggle('is-set', !!cal);
+    }
+
+    // Sheet summary (always visible above the dock on phones)
+    const sumArea = document.getElementById('sumArea');
+    const sumVerdict = document.getElementById('sumVerdict');
+    if (sumArea) {
+      sumArea.textContent = areaData.hasClosedPlot
+        ? formatArea(areaData.plotArea, cal)
+        : (state.polygon.length > 0 ? `${state.polygon.length} corners placed` : 'Not traced yet');
+    }
+    if (sumVerdict) {
+      const land = calculatePositiveLandEnergy(state.metrics, cal);
+      const code = land.verdict.code;
+      sumVerdict.textContent = land.isActive
+        ? ({ RECOMMENDED: 'Recommended', MODERATE: 'Conditional', CAUTION: 'Remedies' }[code] || '—')
+        : (areaData.hasClosedPlot ? 'Set scale' : `N ${Math.round(state.rotation)}°`);
+      sumVerdict.className = `summary-chip ${land.isActive ? ({ RECOMMENDED: 'is-good', MODERATE: 'is-mid', CAUTION: 'is-bad' }[code] || '') : ''}`;
     }
 
     // Update Panch Tatva balance from the real plot area in each element's zones

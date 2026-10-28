@@ -2,652 +2,518 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Vastu Mandala Studio — Vastu Purusha Mandala & Zonal Engine</title>
-  <meta name="description" content="Open-source local Vastu analysis tool: 9x9 Vastu Purusha Mandala, 45 Devtas, 16 directional zones, and 32 perimeter entrance padas.">
+  <meta name="description" content="Trace your floor plan and read it through the Vastu Purusha Mandala: 9×9 grid, 45 Devtas, 16 directional zones and 32 entrances. Works offline on phone, tablet and desktop.">
+  <meta name="theme-color" content="#F7F1E6" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#16110D" media="(prefers-color-scheme: dark)">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Vastu Mandala">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Marcellus&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div class="app-container">
-    <!-- Top Header (Google UI Flat Design) -->
-    <header class="app-header">
-      <div class="header-left">
-        <div class="app-brand">
-          <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="18" height="18" rx="1"/>
-            <line x1="9" y1="3" x2="9" y2="21"/>
-            <line x1="15" y1="3" x2="15" y2="21"/>
-            <line x1="3" y1="9" x2="21" y2="9"/>
-            <line x1="3" y1="15" x2="21" y2="15"/>
-          </svg>
-          <div class="brand-info">
-            <span class="brand-title">Vastu Mandala Studio</span>
-            <span class="brand-badge">Open Source · Local</span>
-          </div>
+  <!-- Icon sprite -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-draw" viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></symbol>
+      <symbol id="i-ruler" viewBox="0 0 24 24"><path d="M3 17 17 3l4 4L7 21z"/><path d="m7 13 2 2M10 10l2 2M13 7l2 2"/></symbol>
+      <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></symbol>
+      <symbol id="i-analysis" viewBox="0 0 24 24"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></symbol>
+      <symbol id="i-share" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/></symbol>
+      <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+      <symbol id="i-redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></symbol>
+      <symbol id="i-plan" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h7v9M14 3v6h7"/></symbol>
+      <symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3"/></symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+      <symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+      <symbol id="i-fit" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+      <symbol id="i-bars" viewBox="0 0 24 24"><path d="M3 21h18"/><rect x="5" y="11" width="3" height="10"/><rect x="10.5" y="5" width="3" height="16"/><rect x="16" y="14" width="3" height="7"/></symbol>
+      <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/></symbol>
+      <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    </defs>
+  </svg>
+
+  <div class="app" id="app">
+    <!-- Top bar -->
+    <header class="topbar">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+          <rect x="2" y="2" width="28" height="28" rx="7" class="brand-mark-bg"/>
+          <path d="M8 8h16v16H8z M13.33 8v16 M18.67 8v16 M8 13.33h16 M8 18.67h16" class="brand-mark-grid"/>
+          <rect x="13.33" y="13.33" width="5.34" height="5.34" class="brand-mark-core"/>
+        </svg>
+        <div class="brand-text">
+          <span class="brand-name">Vastu Mandala</span>
+          <span class="brand-sub">Studio</span>
         </div>
       </div>
 
-      <div class="header-actions">
-        <input type="file" id="fileInput" accept="image/png, image/jpeg, image/webp" style="display: none;">
-        <button id="btnUpload" class="btn btn-primary" title="Upload floor plan drawing (PNG, JPG)">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="17 8 12 3 7 8"/>
-            <line x1="12" y1="3" x2="12" y2="15"/>
-          </svg>
-          Upload Floor Plan
+      <div class="topbar-actions">
+        <button id="btnUndo" class="icon-btn" title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
+          <svg class="icon"><use href="#i-undo"/></svg>
         </button>
-
-        <button id="btnDrawPolygon" class="btn btn-secondary" title="Draw or edit property boundary polygon">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="12 2 22 8.5 17 21 7 21 2 8.5 12 2"/>
-          </svg>
-          Draw Boundary
+        <button id="btnRedo" class="icon-btn" title="Redo (Ctrl+Y)" aria-label="Redo" disabled>
+          <svg class="icon"><use href="#i-redo"/></svg>
         </button>
-
-        <button id="btnSetScale" class="btn btn-secondary" title="Click both ends of a wall, then enter its real length">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 17 17 3l4 4L7 21z"/>
-            <line x1="7" y1="13" x2="9" y2="15"/>
-            <line x1="10" y1="10" x2="12" y2="12"/>
-            <line x1="13" y1="7" x2="15" y2="9"/>
-          </svg>
-          Set Scale
-        </button>
-
-        <div class="header-divider"></div>
-
-        <button id="btnExportPng" class="btn btn-flat" title="Export high-resolution PNG">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-            <circle cx="8.5" cy="8.5" r="1.5"/>
-            <polyline points="21 15 16 10 5 21"/>
-          </svg>
-          Export PNG
-        </button>
-
-        <button id="btnExportPdf" class="btn btn-flat" title="Generate PDF Report">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <line x1="16" y1="13" x2="8" y2="13"/>
-            <line x1="16" y1="17" x2="8" y2="17"/>
-            <polyline points="10 9 9 9 8 9"/>
-          </svg>
-          PDF Report
-        </button>
-
-        <div class="header-divider"></div>
-
-        <!-- History: Undo & Redo -->
-        <button id="btnUndo" class="btn btn-icon-only btn-flat" title="Undo (Ctrl+Z)" disabled>
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="9 14 4 9 9 4"/>
-            <path d="M20 20v-7a4 4 0 0 0-4-4H4"/>
-          </svg>
-        </button>
-
-        <button id="btnRedo" class="btn btn-icon-only btn-flat" title="Redo (Ctrl+Y)" disabled>
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="15 14 20 9 15 4"/>
-            <path d="M4 20v-7a4 4 0 0 1 4-4h12"/>
-          </svg>
-        </button>
-
-        <div class="header-divider"></div>
-
-        <!-- Clear Boundary & Reset All -->
-        <button id="btnClearBoundary" class="btn btn-flat text-secondary" title="Clear boundary polygon and grid (keeps floor plan)">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 6h18"/>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-          </svg>
-          Clear Boundary
-        </button>
-
-        <button id="btnResetAll" class="btn btn-flat text-danger" title="Reset everything to blank canvas">
-          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="1 4 1 10 7 10"/>
-            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-          </svg>
-          Reset All
+        <button class="icon-btn" data-open-panel="plan" title="Floor plan and project" aria-label="Floor plan and project">
+          <svg class="icon"><use href="#i-plan"/></svg>
         </button>
       </div>
     </header>
 
-    <!-- Main Workspace Layout -->
-    <main class="app-workspace">
-      <!-- Center Canvas Viewport -->
-      <div class="canvas-viewport" id="viewportContainer">
-        <canvas id="vastuCanvas"></canvas>
+    <main class="workspace">
+      <!-- Canvas stage -->
+      <div class="stage" id="viewportContainer">
+        <canvas id="vastuCanvas" aria-label="Floor plan canvas"></canvas>
 
-        <!-- Floating Drafting Banner (Visible during boundary drawing) -->
-        <div class="drafting-banner" id="draftingBanner" style="display: none;">
-          <span class="drafting-dot"></span>
-          <span class="drafting-text">Click to place vertices · Click point 0 or double-click to close</span>
-          <button class="btn btn-primary btn-sm" id="btnFinishDraft">Done</button>
+        <!-- Drawing guidance (shown while tracing the boundary) -->
+        <div class="stage-banner" id="draftingBanner" style="display: none;" role="status">
+          <span class="banner-dot"></span>
+          <span class="banner-text">
+            <span class="only-touch">Press and lift to place each corner · lift on point 0 to close</span>
+            <span class="only-mouse">Click each corner · click point 0 or double-click to close</span>
+          </span>
+          <button class="chip-btn chip-btn-solid" id="btnFinishDraft">Done</button>
         </div>
 
-        <!-- Floating Set Scale Banner (Visible while picking the reference wall) -->
-        <div class="drafting-banner" id="scaleBanner" style="display: none;">
-          <span class="drafting-dot"></span>
-          <span class="drafting-text">Set Scale: click both ends of a wall whose real length you know</span>
-          <button class="btn btn-secondary btn-sm" id="btnCancelScale">Cancel</button>
+        <div class="stage-banner" id="scaleBanner" style="display: none;" role="status">
+          <span class="banner-dot banner-dot-brass"></span>
+          <span class="banner-text">Mark both ends of a wall whose real length you know</span>
+          <button class="chip-btn" id="btnCancelScale">Cancel</button>
         </div>
 
-        <!-- Empty state placeholder (visible when no plan loaded) -->
-        <div class="empty-state" id="emptyState">
-          <div class="empty-card">
-            <svg class="empty-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="6" y="6" width="36" height="36" rx="2"/>
-              <line x1="18" y1="6" x2="18" y2="42"/>
-              <line x1="30" y1="6" x2="30" y2="42"/>
-              <line x1="6" y1="18" x2="42" y2="18"/>
-              <line x1="6" y1="30" x2="42" y2="30"/>
+        <!-- Brass compass dial: turn to set North, tap for fine control -->
+        <div class="compass" id="compassBadge">
+          <button class="compass-dial" id="compassButton" aria-label="North direction. Drag to turn, tap for fine control">
+            <svg viewBox="0 0 100 100" aria-hidden="true">
+              <circle cx="50" cy="50" r="47" class="dial-rim"/>
+              <circle cx="50" cy="50" r="40" class="dial-face"/>
+              <g id="compassDial" class="dial-rotor">
+                <g class="dial-ticks"></g>
+                <path d="M50 25 L55 50 L50 46.5 L45 50 Z" class="dial-needle-n"/>
+                <path d="M50 75 L55 50 L50 53.5 L45 50 Z" class="dial-needle-s"/>
+                <text x="50" y="22" class="dial-n">N</text>
+              </g>
+              <circle cx="50" cy="50" r="3.2" class="dial-hub"/>
             </svg>
-            <h3 class="empty-title">Upload Floor Plan or Start Drawing</h3>
-            <p class="empty-desc">Drop an architectural floor plan image (PNG, JPG) here, or use the boundary tool to draw your plot layout directly on the canvas.</p>
-            <div class="empty-actions">
-              <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
-                Select Image File
-              </button>
-              <button class="btn btn-secondary" id="btnBlankCanvas">
-                Use Blank Canvas
-              </button>
+          </button>
+          <span class="compass-deg" id="compassDegDisplay">0°</span>
+        </div>
+
+        <!-- Zoom -->
+        <div class="zoom" aria-label="Zoom">
+          <button id="btnZoomIn" class="zoom-btn only-mouse-flex" title="Zoom in" aria-label="Zoom in"><svg class="icon"><use href="#i-plus"/></svg></button>
+          <span class="zoom-level only-mouse-flex" id="zoomLevelText">100%</span>
+          <button id="btnZoomOut" class="zoom-btn only-mouse-flex" title="Zoom out" aria-label="Zoom out"><svg class="icon"><use href="#i-minus"/></svg></button>
+          <button id="btnZoomReset" class="zoom-btn" title="Fit to view" aria-label="Fit to view"><svg class="icon"><use href="#i-fit"/></svg></button>
+        </div>
+
+        <!-- First run: the three steps of a reading -->
+        <div class="onboard" id="emptyState">
+          <div class="onboard-card">
+            <svg class="onboard-mandala" viewBox="0 0 90 90" aria-hidden="true">
+              <rect x="3" y="3" width="84" height="84" rx="4"/>
+              <path d="M13 3v84M23 3v84M33 3v84M43 3v84M53 3v84M63 3v84M73 3v84M3 13h84M3 23h84M3 33h84M3 43h84M3 53h84M3 63h84M3 73h84" class="onboard-mandala-grid"/>
+              <rect x="33" y="33" width="30" height="30" class="onboard-mandala-core"/>
+            </svg>
+            <h1 class="onboard-title">Read your home through the mandala</h1>
+            <ol class="onboard-steps">
+              <li><span class="step-n">1</span><span><strong>Add your floor plan</strong> — a photo, an image file, or a blank canvas</span></li>
+              <li><span class="step-n">2</span><span><strong>Trace the boundary</strong> — mark each outer corner of the plot</span></li>
+              <li><span class="step-n">3</span><span><strong>Set scale and North</strong> — one wall's real length, then turn the compass</span></li>
+            </ol>
+            <div class="onboard-actions">
+              <button class="btn btn-primary only-touch-flex" data-action="camera"><svg class="icon"><use href="#i-camera"/></svg>Take photo</button>
+              <button class="btn btn-primary btn-on-mouse" id="btnUpload"><svg class="icon"><use href="#i-upload"/></svg>Choose image</button>
+              <button class="btn btn-quiet" id="btnBlankCanvas">Start on a blank canvas</button>
             </div>
           </div>
-        </div>
-
-        <!-- Floating Viewport Controls (Bottom Left) -->
-        <div class="viewport-toolbar">
-          <button id="btnZoomIn" class="tool-btn" title="Zoom In (+)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="5" x2="12" y2="19"/>
-              <line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-          </button>
-          <span class="zoom-indicator" id="zoomLevelText">100%</span>
-          <button id="btnZoomOut" class="tool-btn" title="Zoom Out (-)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-          </button>
-          <button id="btnZoomReset" class="tool-btn" title="Fit to View">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="15 3 21 3 21 9"/>
-              <polyline points="9 21 3 21 3 15"/>
-              <line x1="21" y1="3" x2="14" y2="10"/>
-              <line x1="3" y1="21" x2="10" y2="14"/>
-            </svg>
-          </button>
-        </div>
-
-        <!-- Compass North Indicator Badge (Floating Top Right of Canvas) -->
-        <div class="compass-badge" id="compassBadge" title="True North Orientation">
-          <div class="compass-dial" id="compassDial">
-            <span class="needle-n">N</span>
-            <div class="needle-arrow"></div>
-          </div>
-          <span class="compass-deg" id="compassDegDisplay">0°</span>
         </div>
       </div>
 
-      <!-- Right Control Sidebar (Google UI Style) -->
-      <aside class="app-sidebar" id="appSidebar">
-        <!-- Section: Universal Rotation (North Calibration) -->
-        <div class="sidebar-section">
-          <div class="section-header">
-            <span class="section-title">Universal Rotation</span>
-            <span class="badge-value" id="rotationBadge">0°</span>
-          </div>
-          <div class="rotation-control-row">
-            <input type="range" id="rotationSlider" min="0" max="360" value="0" step="0.5" class="range-slider">
-          </div>
-          <div class="rotation-inputs-row">
-            <div class="input-with-unit">
-              <input type="number" id="rotationNumber" min="0" max="360" value="0" step="0.5" class="text-input">
-              <span class="input-unit">deg</span>
+      <!-- Panel: bottom sheet on phones, side panel on large screens -->
+      <aside class="panel" id="panel" data-sheet="peek" aria-label="Vastu panel">
+        <div class="panel-handle" id="panelHandle">
+          <span class="grip" aria-hidden="true"></span>
+          <div class="panel-summary">
+            <div class="summary-main">
+              <span class="summary-label">Plot</span>
+              <span class="summary-value" id="sumArea">Not traced yet</span>
             </div>
-            <button id="btnResetRotation" class="btn btn-flat btn-sm">Reset</button>
+            <span class="summary-chip" id="sumVerdict">—</span>
           </div>
-          <label class="toggle-item">
-            <div class="toggle-info">
-              <span class="toggle-label">Align Grid to Plot Walls</span>
-              <span class="toggle-sub">Off: 9×9 grid turns with North · On: grid stays on the walls</span>
-            </div>
-            <div class="switch">
-              <input type="checkbox" id="toggleGridWalls">
-              <span class="slider"></span>
-            </div>
-          </label>
         </div>
 
-        <!-- Section: Analytical Overlays & Toggles -->
-        <div class="sidebar-section">
-          <div class="section-header">
-            <span class="section-title">Vastu Overlays</span>
-          </div>
+        <nav class="panel-tabs" role="tablist" aria-label="Panel sections">
+          <button role="tab" data-tab="layers">Layers</button>
+          <button role="tab" data-tab="analysis">Analysis</button>
+          <button role="tab" data-tab="north">North</button>
+          <button role="tab" data-tab="export">Export</button>
+          <button role="tab" data-tab="plan">Plan</button>
+        </nav>
 
-          <div class="toggle-list">
-            <!-- 9x9 Grid -->
-            <label class="toggle-item">
-              <div class="toggle-info">
-                <span class="toggle-label">9×9 Vastu Grid</span>
-                <span class="toggle-sub">Classical 81 Padas matrix</span>
-              </div>
-              <div class="switch">
+        <div class="panel-body" id="panelBody">
+          <!-- LAYERS -->
+          <section class="panel-section" data-panel="layers">
+            <h2 class="section-heading">Overlays</h2>
+            <div class="layer-grid">
+              <label class="layer-tile">
                 <input type="checkbox" id="toggleGrid9x9" checked>
-                <span class="slider"></span>
-              </div>
-            </label>
-
-            <!-- Brahmasthan -->
-            <label class="toggle-item">
-              <div class="toggle-info">
-                <span class="toggle-label">Brahmasthan</span>
-                <span class="toggle-sub">Central 3×3 (9 padas)</span>
-              </div>
-              <div class="switch">
+                <span class="layer-body">
+                  <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>
+                  <span class="layer-name">9×9 grid</span>
+                  <span class="layer-sub">81 padas</span>
+                </span>
+              </label>
+              <label class="layer-tile">
                 <input type="checkbox" id="toggleBrahmasthan" checked>
-                <span class="slider"></span>
-              </div>
-            </label>
-
-            <!-- 45 Devtas -->
-            <label class="toggle-item">
-              <div class="toggle-info">
-                <span class="toggle-label">45 Devtas</span>
-                <span class="toggle-sub">All 32 outer + 13 inner devtas</span>
-              </div>
-              <div class="switch">
+                <span class="layer-body">
+                  <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18"/><rect x="9" y="9" width="6" height="6" class="glyph-fill"/></svg>
+                  <span class="layer-name">Brahmasthan</span>
+                  <span class="layer-sub">Central 9 padas</span>
+                </span>
+              </label>
+              <label class="layer-tile">
                 <input type="checkbox" id="toggleDevtas45">
-                <span class="slider"></span>
-              </div>
-            </label>
-
-            <!-- 45 Devtas Names -->
-            <label class="toggle-item">
-              <div class="toggle-info">
-                <span class="toggle-label">Devta Names</span>
-                <span class="toggle-sub">Text labels & pada numbers</span>
-              </div>
-              <div class="switch">
+                <span class="layer-body">
+                  <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18"/><rect x="7" y="7" width="10" height="10"/><path d="M3 7h4M3 11h4M3 15h4M17 7h4M17 11h4M17 15h4"/></svg>
+                  <span class="layer-name">45 Devtas</span>
+                  <span class="layer-sub">32 outer · 13 inner</span>
+                </span>
+              </label>
+              <label class="layer-tile">
                 <input type="checkbox" id="toggleDevtaNames">
-                <span class="slider"></span>
-              </div>
-            </label>
-
-            <!-- 16 Directions -->
-            <label class="toggle-item">
-              <div class="toggle-info">
-                <span class="toggle-label">16 Directional Zones</span>
-                <span class="toggle-sub">22.5° rays from centroid</span>
-              </div>
-              <div class="switch">
+                <span class="layer-body">
+                  <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19 9 5l5 14M6 14h6"/><path d="M15 19v-6a3 3 0 0 1 6 0v6M15 16h6"/></svg>
+                  <span class="layer-name">Devta names</span>
+                  <span class="layer-sub">Labels and numbers</span>
+                </span>
+              </label>
+              <label class="layer-tile">
                 <input type="checkbox" id="toggleZones16">
-                <span class="slider"></span>
-              </div>
-            </label>
-
-            <!-- 32 Perimeter Gates -->
-            <label class="toggle-item">
-              <div class="toggle-info">
-                <span class="toggle-label">32 Entrance Padas</span>
-                <span class="toggle-sub">N1–N8, E1–E8, S1–S8, W1–W8</span>
-              </div>
-              <div class="switch">
+                <span class="layer-body">
+                  <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/></svg>
+                  <span class="layer-name">16 zones</span>
+                  <span class="layer-sub">22.5° each</span>
+                </span>
+              </label>
+              <label class="layer-tile">
                 <input type="checkbox" id="toggleGates32">
-                <span class="slider"></span>
-              </div>
-            </label>
-
-            <!-- Marma Sthan -->
-            <label class="toggle-item">
-              <div class="toggle-info">
-                <span class="toggle-label">Marma Sthan</span>
-                <span class="toggle-sub">Sensitive diagonal energy lines</span>
-              </div>
-              <div class="switch">
+                <span class="layer-body">
+                  <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14"/><path d="M9 2v3M12 2v3M15 2v3M9 19v3M12 19v3M15 19v3M2 9h3M2 12h3M2 15h3M19 9h3M19 12h3M19 15h3"/></svg>
+                  <span class="layer-name">32 entrances</span>
+                  <span class="layer-sub">N1–N8 … W1–W8</span>
+                </span>
+              </label>
+              <label class="layer-tile">
                 <input type="checkbox" id="toggleMarma">
-                <span class="slider"></span>
-              </div>
-            </label>
-
-            <!-- Panch Tatva / Five Elements -->
-            <label class="toggle-item">
-              <div class="toggle-info">
-                <span class="toggle-label">Panch Tatva (5 Elements)</span>
-                <span class="toggle-sub">Elemental zonal colors</span>
-              </div>
-              <div class="switch">
+                <span class="layer-body">
+                  <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18"/><path d="m3 3 18 18M21 3 3 21"/><circle cx="12" cy="12" r="1.6" class="glyph-fill"/></svg>
+                  <span class="layer-name">Marma sthan</span>
+                  <span class="layer-sub">Sensitive lines</span>
+                </span>
+              </label>
+              <label class="layer-tile">
                 <input type="checkbox" id="toggleElements">
-                <span class="slider"></span>
+                <span class="layer-body">
+                  <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2.2"/><circle cx="19" cy="10" r="2.2"/><circle cx="16.5" cy="18.5" r="2.2"/><circle cx="7.5" cy="18.5" r="2.2"/><circle cx="5" cy="10" r="2.2"/></svg>
+                  <span class="layer-name">Panch tatva</span>
+                  <span class="layer-sub">Element colours</span>
+                </span>
+              </label>
+            </div>
+          </section>
+
+          <!-- ANALYSIS -->
+          <section class="panel-section" data-panel="analysis">
+            <h2 class="section-heading">Plot <span class="badge-value" id="valAreaBadge">0 sq px</span></h2>
+            <div class="metrics-grid">
+              <div class="metric-card">
+                <span class="metric-title">Plot area</span>
+                <span class="metric-value" id="valArea">0 sq px</span>
               </div>
+              <div class="metric-card">
+                <span class="metric-title">Brahmasthan</span>
+                <span class="metric-value" id="valBrahmaArea">—</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-title">Pada size</span>
+                <span class="metric-value" id="valPadaArea">—</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-title">Grid (W × H)</span>
+                <span class="metric-value" id="valDimensions">—</span>
+              </div>
+            </div>
+            <div class="scale-status" id="valScale">Scale not set — use Set Scale for real feet / metres</div>
+
+            <h2 class="section-heading">Land energy <span class="badge-value" id="landEnergyBadge">No Plot</span></h2>
+            <div class="energy-metrics-grid">
+              <div class="energy-card card-income">
+                <span class="energy-card-title">Income potential</span>
+                <span class="energy-card-value" id="valLandIncome">0.00</span>
+                <span class="energy-card-sub" id="valLandIncomeFormula">Length: 0 × 8</span>
+              </div>
+              <div class="energy-card card-expenditure">
+                <span class="energy-card-title">Expenditure tendency</span>
+                <span class="energy-card-value" id="valLandExpenditure">0.00</span>
+                <span class="energy-card-sub" id="valLandExpenditureFormula">Breadth: 0 × 10.8</span>
+              </div>
+            </div>
+
+            <div class="energy-status-card" id="cardIncomeComparison">
+              <div class="energy-status-header">
+                <span class="energy-status-icon" id="iconIncomeComparison">—</span>
+                <span class="energy-status-title" id="titleIncomeComparison">Income vs expenditure</span>
+              </div>
+              <div class="energy-status-sub" id="subIncomeComparison">Close plot to evaluate financial balance</div>
+            </div>
+
+            <div class="energy-status-card" id="cardEnergyPattern">
+              <div class="energy-status-header">
+                <span class="energy-status-icon" id="iconEnergyPattern">—</span>
+                <span class="energy-status-title" id="labelEnergyPattern">Energy Pattern (Remainder: —)</span>
+              </div>
+              <div class="energy-status-sub" id="descEnergyPattern">Close boundary to compute pattern</div>
+              <div class="energy-calc-sub" id="calcEnergyPattern">(L + B) ÷ 8 = remainder</div>
+            </div>
+
+            <div class="energy-status-card" id="cardLengthProportion">
+              <div class="energy-status-header">
+                <span class="energy-status-icon" id="iconLengthProportion">—</span>
+                <span class="energy-status-title" id="labelLengthProportion">Length Proportion (Ratio: —)</span>
+              </div>
+              <div class="energy-status-sub" id="descLengthProportion">Evaluates plot elongation</div>
+              <div class="energy-calc-sub" id="calcLengthProportion">Length should be ≤ 2.5 × Breadth</div>
+            </div>
+
+            <div class="energy-verdict-box verdict-neutral" id="cardLandVerdict">
+              <div class="verdict-tag" id="tagLandVerdict">DRAW BOUNDARY</div>
+              <div class="verdict-summary" id="summaryLandVerdict">Plot boundary required to calculate land energy indicators.</div>
+            </div>
+
+            <h2 class="section-heading">Panch tatva balance</h2>
+            <div class="elemental-bar" id="elementalBar" title="Share of plot area in each element's zones">
+              <div class="elemental-segment seg-water" data-element="water" style="width: 20%"></div>
+              <div class="elemental-segment seg-air" data-element="air" style="width: 20%"></div>
+              <div class="elemental-segment seg-fire" data-element="fire" style="width: 20%"></div>
+              <div class="elemental-segment seg-earth" data-element="earth" style="width: 20%"></div>
+              <div class="elemental-segment seg-space" data-element="space" style="width: 20%"></div>
+            </div>
+            <div class="elemental-list">
+              <div class="elemental-row"><span class="elem-label"><span class="elem-dot dot-water"></span><span class="elem-name">Water · Jal</span></span><span class="elem-zones" data-element-zones="water">—</span><span class="elem-pct" data-element-pct="water">—</span></div>
+              <div class="elemental-row"><span class="elem-label"><span class="elem-dot dot-air"></span><span class="elem-name">Air · Vayu</span></span><span class="elem-zones" data-element-zones="air">—</span><span class="elem-pct" data-element-pct="air">—</span></div>
+              <div class="elemental-row"><span class="elem-label"><span class="elem-dot dot-fire"></span><span class="elem-name">Fire · Agni</span></span><span class="elem-zones" data-element-zones="fire">—</span><span class="elem-pct" data-element-pct="fire">—</span></div>
+              <div class="elemental-row"><span class="elem-label"><span class="elem-dot dot-earth"></span><span class="elem-name">Earth · Prithvi</span></span><span class="elem-zones" data-element-zones="earth">—</span><span class="elem-pct" data-element-pct="earth">—</span></div>
+              <div class="elemental-row"><span class="elem-label"><span class="elem-dot dot-space"></span><span class="elem-name">Space · Akash</span></span><span class="elem-zones" data-element-zones="space">—</span><span class="elem-pct" data-element-pct="space">—</span></div>
+            </div>
+            <p class="scale-status">Share of the plot's area in each element's zones</p>
+            <button id="btnOpenBarChart" class="btn btn-secondary btn-block" disabled title="Close the plot boundary first">
+              <svg class="icon"><use href="#i-bars"/></svg>View 16 bar chart
+            </button>
+
+            <h2 class="section-heading">Entrance gateways <span class="badge-value badge-success">8 auspicious</span></h2>
+            <div class="gate-assessment-grid">
+              <div class="gate-card"><span class="gate-dir">North</span><span class="gate-code">N3 · N4</span><span class="gate-sub">Mukhya, Bhallata</span></div>
+              <div class="gate-card"><span class="gate-dir">East</span><span class="gate-code">E3 · E4</span><span class="gate-sub">Jayanta, Indra</span></div>
+              <div class="gate-card"><span class="gate-dir">South</span><span class="gate-code">S3 · S4</span><span class="gate-sub">Vitatha, Brihatkshata</span></div>
+              <div class="gate-card"><span class="gate-dir">West</span><span class="gate-code">W3 · W4</span><span class="gate-sub">Sugriva, Pushpadanta</span></div>
+            </div>
+          </section>
+
+          <!-- NORTH -->
+          <section class="panel-section" data-panel="north">
+            <h2 class="section-heading">North <span class="badge-value" id="rotationBadge">0°</span></h2>
+            <div class="north-dial-wrap">
+              <button class="compass-dial compass-dial-lg" id="northDialLarge" aria-label="Drag to turn North">
+                <svg viewBox="0 0 100 100" aria-hidden="true">
+                  <circle cx="50" cy="50" r="47" class="dial-rim"/>
+                  <circle cx="50" cy="50" r="40" class="dial-face"/>
+                  <g class="dial-rotor" id="northDialLargeRotor">
+                    <g class="dial-ticks"></g>
+                    <path d="M50 25 L55 50 L50 46.5 L45 50 Z" class="dial-needle-n"/>
+                    <path d="M50 75 L55 50 L50 53.5 L45 50 Z" class="dial-needle-s"/>
+                    <text x="50" y="22" class="dial-n">N</text>
+                  </g>
+                  <circle cx="50" cy="50" r="3.2" class="dial-hub"/>
+                </svg>
+              </button>
+              <p class="north-hint">Turn the dial until N points to true North on your plan</p>
+            </div>
+            <input type="range" id="rotationSlider" min="0" max="360" value="0" step="0.5" class="range" aria-label="North rotation in degrees">
+            <div class="north-row">
+              <button class="icon-btn icon-btn-boxed" id="btnRotateMinus" aria-label="Turn 1° anticlockwise"><svg class="icon"><use href="#i-minus"/></svg></button>
+              <label class="deg-input">
+                <input type="number" id="rotationNumber" min="0" max="360" value="0" step="0.5" inputmode="decimal" aria-label="North in degrees">
+                <span>°</span>
+              </label>
+              <button class="icon-btn icon-btn-boxed" id="btnRotatePlus" aria-label="Turn 1° clockwise"><svg class="icon"><use href="#i-plus"/></svg></button>
+              <button id="btnResetRotation" class="chip-btn">Reset</button>
+            </div>
+            <label class="switch-row">
+              <span class="switch-text">
+                <span class="switch-label">Align grid to plot walls</span>
+                <span class="switch-sub">Off: the 9×9 grid turns with North. On: it stays on the walls.</span>
+              </span>
+              <span class="switch">
+                <input type="checkbox" id="toggleGridWalls">
+                <span class="switch-track"></span>
+              </span>
             </label>
-          </div>
-        </div>
+          </section>
 
-        <!-- Section: Property Boundary & Geometry Metrics -->
-        <div class="sidebar-section">
-          <div class="section-header">
-            <span class="section-title">Plot Area & Metrics</span>
-            <span class="badge-value" id="valAreaBadge">0 sq px</span>
-          </div>
+          <!-- EXPORT -->
+          <section class="panel-section" data-panel="export">
+            <h2 class="section-heading">Share your reading</h2>
+            <button id="btnExportPdf" class="action-row">
+              <span class="action-icon"><svg class="icon"><use href="#i-file"/></svg></span>
+              <span class="action-text"><span class="action-title">PDF report</span><span class="action-sub">Plan, metrics, elements, entrances and the 16-direction chart</span></span>
+            </button>
+            <button id="btnExportPng" class="action-row">
+              <span class="action-icon"><svg class="icon"><use href="#i-image"/></svg></span>
+              <span class="action-text"><span class="action-title">Plan image</span><span class="action-sub">The canvas with the overlays you have switched on</span></span>
+            </button>
+          </section>
 
-          <div class="metrics-grid">
-            <div class="metric-card">
-              <span class="metric-title">Plot Area</span>
-              <span class="metric-value" id="valArea">0 sq px</span>
-            </div>
-            <div class="metric-card">
-              <span class="metric-title">Brahmasthan (3×3)</span>
-              <span class="metric-value" id="valBrahmaArea">—</span>
-            </div>
-            <div class="metric-card">
-              <span class="metric-title">Pada Size (1/81)</span>
-              <span class="metric-value" id="valPadaArea">—</span>
-            </div>
-            <div class="metric-card">
-              <span class="metric-title">Dimensions (W × H)</span>
-              <span class="metric-value" id="valDimensions">—</span>
-            </div>
-          </div>
-          <div class="scale-status" id="valScale">Scale not set — use Set Scale for real feet / metres</div>
-        </div>
-
-        <!-- Section: Positive Land Energy Analysis -->
-        <div class="sidebar-section land-energy-section" id="landEnergySection">
-          <div class="section-header">
-            <span class="section-title">
-              <span class="energy-icon">⚡</span> Positive Land Energy
-            </span>
-            <span class="badge-value" id="landEnergyBadge">No Plot</span>
-          </div>
-
-          <!-- Dual Income & Expenditure Cards -->
-          <div class="energy-metrics-grid">
-            <div class="energy-card card-income">
-              <div class="energy-card-header">
-                <span class="energy-card-icon icon-up">↗</span>
-                <span class="energy-card-title">Income Potential</span>
-              </div>
-              <div class="energy-card-value" id="valLandIncome">0.00</div>
-              <div class="energy-card-sub" id="valLandIncomeFormula">Length: 0 × 8</div>
-            </div>
-
-            <div class="energy-card card-expenditure">
-              <div class="energy-card-header">
-                <span class="energy-card-icon icon-down">↘</span>
-                <span class="energy-card-title">Expenditure Tendency</span>
-              </div>
-              <div class="energy-card-value" id="valLandExpenditure">0.00</div>
-              <div class="energy-card-sub" id="valLandExpenditureFormula">Breadth: 0 × 10.8</div>
-            </div>
-          </div>
-
-          <!-- Comparison Indicator Card -->
-          <div class="energy-status-card status-good" id="cardIncomeComparison">
-            <div class="energy-status-header">
-              <span class="energy-status-icon" id="iconIncomeComparison">✔</span>
-              <span class="energy-status-title" id="titleIncomeComparison">Income > Expenditure</span>
-            </div>
-            <div class="energy-status-sub" id="subIncomeComparison">Good financial prospects for this land</div>
-          </div>
-
-          <!-- Energy Pattern (Remainder Method) -->
-          <div class="energy-status-card status-pattern" id="cardEnergyPattern">
-            <div class="energy-pattern-header">
-              <span class="energy-pattern-label" id="labelEnergyPattern">Energy Pattern (Remainder: —)</span>
-            </div>
-            <div class="energy-status-row">
-              <span class="energy-status-icon" id="iconEnergyPattern">✔</span>
-              <span class="energy-status-desc" id="descEnergyPattern">Close boundary to compute pattern</span>
-            </div>
-            <div class="energy-calc-sub" id="calcEnergyPattern">(L + B) ÷ 8 = remainder</div>
-          </div>
-
-          <!-- Length Proportion (Ratio) -->
-          <div class="energy-status-card status-ratio" id="cardLengthProportion">
-            <div class="energy-pattern-header">
-              <span class="energy-pattern-label" id="labelLengthProportion">Length Proportion (Ratio: —)</span>
-            </div>
-            <div class="energy-status-row">
-              <span class="energy-status-icon" id="iconLengthProportion">✔</span>
-              <span class="energy-status-desc" id="descLengthProportion">Positive Energy (Length proportion good)</span>
-            </div>
-            <div class="energy-calc-sub" id="calcLengthProportion">Length should be ≤ 2.5 × Breadth</div>
-          </div>
-
-          <!-- Final Land Energy Verdict -->
-          <div class="energy-verdict-box verdict-recommended" id="cardLandVerdict">
-            <div class="verdict-tag" id="tagLandVerdict">🎯 RECOMMENDED LAND</div>
-            <div class="verdict-summary" id="summaryLandVerdict">
-              This land shows predominantly positive Vastu energy patterns suitable for prosperity and well-being.
-            </div>
-          </div>
-        </div>
-
-        <!-- Section: Panch Tatva (5 Elements) Distribution -->
-        <div class="sidebar-section">
-          <div class="section-header">
-            <span class="section-title">Panch Tatva Balance</span>
-            <span class="badge-value">5 Elements</span>
-          </div>
-
-          <!-- Stacked Segmented Progress Bar (filled from real zone areas) -->
-          <div class="elemental-bar" id="elementalBar" title="Share of plot area in each element's zones">
-            <div class="elemental-segment seg-water" data-element="water" style="width: 20%"></div>
-            <div class="elemental-segment seg-air" data-element="air" style="width: 20%"></div>
-            <div class="elemental-segment seg-fire" data-element="fire" style="width: 20%"></div>
-            <div class="elemental-segment seg-earth" data-element="earth" style="width: 20%"></div>
-            <div class="elemental-segment seg-space" data-element="space" style="width: 20%"></div>
-          </div>
-
-          <!-- Elemental Distribution Legend / List -->
-          <div class="elemental-list">
-            <div class="elemental-row">
-              <div class="elem-label">
-                <span class="elem-dot dot-water"></span>
-                <span class="elem-name">Water (Jal)</span>
-              </div>
-              <span class="elem-zones" data-element-zones="water">—</span>
-              <span class="elem-pct" data-element-pct="water">—</span>
-            </div>
-            <div class="elemental-row">
-              <div class="elem-label">
-                <span class="elem-dot dot-air"></span>
-                <span class="elem-name">Air (Vayu)</span>
-              </div>
-              <span class="elem-zones" data-element-zones="air">—</span>
-              <span class="elem-pct" data-element-pct="air">—</span>
-            </div>
-            <div class="elemental-row">
-              <div class="elem-label">
-                <span class="elem-dot dot-fire"></span>
-                <span class="elem-name">Fire (Agni)</span>
-              </div>
-              <span class="elem-zones" data-element-zones="fire">—</span>
-              <span class="elem-pct" data-element-pct="fire">—</span>
-            </div>
-            <div class="elemental-row">
-              <div class="elem-label">
-                <span class="elem-dot dot-earth"></span>
-                <span class="elem-name">Earth (Prithvi)</span>
-              </div>
-              <span class="elem-zones" data-element-zones="earth">—</span>
-              <span class="elem-pct" data-element-pct="earth">—</span>
-            </div>
-            <div class="elemental-row">
-              <div class="elem-label">
-                <span class="elem-dot dot-space"></span>
-                <span class="elem-name">Space (Akash)</span>
-              </div>
-              <span class="elem-zones" data-element-zones="space">—</span>
-              <span class="elem-pct" data-element-pct="space">—</span>
-            </div>
-          </div>
-          <div class="scale-status">Share of the plot's area in each element's zones</div>
-          <button id="btnOpenBarChart" class="btn btn-secondary btn-sm btn-block" disabled title="Close the plot boundary first">
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="4" y1="20" x2="20" y2="20"/>
-              <rect x="5" y="11" width="3" height="9"/>
-              <rect x="10.5" y="6" width="3" height="14"/>
-              <rect x="16" y="14" width="3" height="6"/>
-            </svg>
-            View 16 Bar Chart
-          </button>
-        </div>
-
-        <!-- Section: Entrance Gate Assessment -->
-        <div class="sidebar-section">
-          <div class="section-header">
-            <span class="section-title">Entrance Gateways</span>
-            <span class="badge-value badge-success">8 Auspicious</span>
-          </div>
-
-          <div class="gate-assessment-grid">
-            <div class="gate-card gate-auspicious">
-              <span class="gate-dir">North</span>
-              <span class="gate-code">N3, N4</span>
-              <span class="gate-sub">Mukhya, Bhallata</span>
-            </div>
-            <div class="gate-card gate-auspicious">
-              <span class="gate-dir">East</span>
-              <span class="gate-code">E3, E4</span>
-              <span class="gate-sub">Jayanta, Indra</span>
-            </div>
-            <div class="gate-card gate-auspicious">
-              <span class="gate-dir">South</span>
-              <span class="gate-code">S3, S4</span>
-              <span class="gate-sub">Vitatha, Brihatkshata</span>
-            </div>
-            <div class="gate-card gate-auspicious">
-              <span class="gate-dir">West</span>
-              <span class="gate-code">W3, W4</span>
-              <span class="gate-sub">Sugriva, Pushpadanta</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Footer / Instructions Card -->
-        <div class="sidebar-footer">
-          <span class="footer-note">Navigation: Drag with mouse to pan · Scroll wheel to zoom · Click vertices to draft boundary</span>
+          <!-- PLAN -->
+          <section class="panel-section" data-panel="plan">
+            <h2 class="section-heading">Floor plan</h2>
+            <button class="action-row only-touch-flex" data-action="camera">
+              <span class="action-icon"><svg class="icon"><use href="#i-camera"/></svg></span>
+              <span class="action-text"><span class="action-title">Take photo</span><span class="action-sub">Photograph a printed plan, held flat and square</span></span>
+            </button>
+            <button class="action-row" data-action="upload">
+              <span class="action-icon"><svg class="icon"><use href="#i-upload"/></svg></span>
+              <span class="action-text"><span class="action-title">Choose image</span><span class="action-sub">PNG, JPG or WebP from your device</span></span>
+            </button>
+            <h2 class="section-heading">Project</h2>
+            <button id="btnClearBoundary" class="action-row">
+              <span class="action-icon"><svg class="icon"><use href="#i-trash"/></svg></span>
+              <span class="action-text"><span class="action-title">Clear boundary</span><span class="action-sub">Keeps the floor plan, scale and North · undo brings it back</span></span>
+            </button>
+            <button id="btnResetAll" class="action-row action-danger">
+              <span class="action-icon"><svg class="icon"><use href="#i-reset"/></svg></span>
+              <span class="action-text"><span class="action-title">Start over</span><span class="action-sub">Removes the plan, boundary, scale and saved project</span></span>
+            </button>
+            <p class="scale-status">Your project is saved on this device automatically.</p>
+          </section>
         </div>
       </aside>
+
+      <!-- Dock -->
+      <nav class="dock" id="dock" aria-label="Tools">
+        <button class="dock-btn" id="btnDrawPolygon" title="Trace the plot boundary">
+          <svg class="icon"><use href="#i-draw"/></svg><span class="dock-label">Draw</span>
+        </button>
+        <button class="dock-btn" id="btnSetScale" title="Click both ends of a wall, then enter its real length">
+          <svg class="icon"><use href="#i-ruler"/></svg><span class="dock-label">Scale</span>
+        </button>
+        <span class="dock-sep" aria-hidden="true"></span>
+        <button class="dock-btn" data-open-panel="layers">
+          <svg class="icon"><use href="#i-layers"/></svg><span class="dock-label">Layers</span>
+        </button>
+        <button class="dock-btn" data-open-panel="analysis">
+          <svg class="icon"><use href="#i-analysis"/></svg><span class="dock-label">Analysis</span>
+        </button>
+        <button class="dock-btn" data-open-panel="export">
+          <svg class="icon"><use href="#i-share"/></svg><span class="dock-label">Export</span>
+        </button>
+      </nav>
     </main>
   </div>
 
-  <!-- 16 Direction Bar Chart Modal -->
-  <div id="barChartBackdrop" class="modal-backdrop" style="display: none;">
-    <div class="modal-dialog modal-wide">
-      <div class="modal-header">
-        <div class="modal-title-wrap">
-          <h3 class="modal-title">16 Direction Bar Chart</h3>
-          <p class="modal-subtitle">Area distribution by direction — share of the plot's area in each compass zone</p>
-        </div>
-        <button id="btnBarChartClose" class="modal-close" title="Close">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
+  <input type="file" id="fileInput" accept="image/png, image/jpeg, image/webp" hidden>
+  <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
 
+  <!-- 16 Direction Bar Chart -->
+  <div id="barChartBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal-dialog modal-wide" role="dialog" aria-modal="true" aria-labelledby="barChartTitle">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="barChartTitle">16 direction bar chart</h3>
+          <p class="modal-subtitle">Share of the plot's area in each compass zone</p>
+        </div>
+        <button id="btnBarChartClose" class="icon-btn" aria-label="Close"><svg class="icon"><use href="#i-close"/></svg></button>
+      </div>
       <div class="modal-body">
         <canvas id="barChartCanvas" class="bar-chart-canvas"></canvas>
         <div class="bar-chart-stats">
-          <div class="bar-stat"><span class="bar-stat-label">Total Area</span><span class="bar-stat-value" id="barStatTotal">—</span></div>
+          <div class="bar-stat"><span class="bar-stat-label">Total area</span><span class="bar-stat-value" id="barStatTotal">—</span></div>
           <div class="bar-stat"><span class="bar-stat-label">Average</span><span class="bar-stat-value" id="barStatMean">—</span></div>
-          <div class="bar-stat"><span class="bar-stat-label">Max Direction</span><span class="bar-stat-value" id="barStatMax">—</span></div>
-          <div class="bar-stat"><span class="bar-stat-label">Min Direction</span><span class="bar-stat-value" id="barStatMin">—</span></div>
+          <div class="bar-stat"><span class="bar-stat-label">Largest</span><span class="bar-stat-value" id="barStatMax">—</span></div>
+          <div class="bar-stat"><span class="bar-stat-label">Smallest</span><span class="bar-stat-value" id="barStatMin">—</span></div>
         </div>
       </div>
-
       <div class="modal-footer">
-        <button id="btnBarChartPng" class="btn btn-secondary">Export PNG</button>
-        <button id="btnBarChartDone" class="btn btn-primary">Close</button>
+        <button id="btnBarChartPng" class="btn btn-secondary">Save chart image</button>
+        <button id="btnBarChartDone" class="btn btn-primary">Done</button>
       </div>
     </div>
   </div>
 
-  <!-- Set Scale Modal -->
+  <!-- Set Scale -->
   <div id="scaleModalBackdrop" class="modal-backdrop" style="display: none;">
-    <div class="modal-dialog">
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="scaleTitle">
       <div class="modal-header">
-        <div class="modal-title-wrap">
-          <h3 class="modal-title">Set Scale</h3>
+        <div>
+          <h3 class="modal-title" id="scaleTitle">Set scale</h3>
           <p class="modal-subtitle" id="scaleModalSubtitle">Enter the real length of the line you just drew.</p>
         </div>
-        <button id="btnScaleModalClose" class="modal-close" title="Cancel">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
+        <button id="btnScaleModalClose" class="icon-btn" aria-label="Cancel"><svg class="icon"><use href="#i-close"/></svg></button>
       </div>
-
       <div class="modal-body">
-        <div class="form-group">
-          <label class="form-label" for="scaleLength">Real length</label>
-          <div class="scale-input-row">
-            <input type="number" id="scaleLength" class="form-input" min="0" step="0.1" placeholder="e.g. 40">
-            <select id="scaleUnit" class="form-input scale-unit-select">
-              <option value="ft">feet</option>
-              <option value="m">metres</option>
-            </select>
-          </div>
+        <label class="form-label" for="scaleLength">Real length</label>
+        <div class="scale-input-row">
+          <input type="number" id="scaleLength" class="form-input" min="0" step="0.1" inputmode="decimal" placeholder="40">
+          <select id="scaleUnit" class="form-input scale-unit-select">
+            <option value="ft">feet</option>
+            <option value="m">metres</option>
+          </select>
         </div>
       </div>
-
       <div class="modal-footer">
         <button id="btnScaleModalCancel" class="btn btn-secondary">Cancel</button>
-        <button id="btnScaleModalApply" class="btn btn-primary">Apply Scale</button>
+        <button id="btnScaleModalApply" class="btn btn-primary">Apply scale</button>
       </div>
     </div>
   </div>
 
-  <!-- PDF Report Details Modal (Google UI Design) -->
+  <!-- PDF details -->
   <div id="pdfModalBackdrop" class="modal-backdrop" style="display: none;">
-    <div class="modal-dialog">
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="pdfTitle">
       <div class="modal-header">
-        <div class="modal-title-wrap">
-          <h3 class="modal-title">PDF Report Details</h3>
-          <p class="modal-subtitle">Add your details to include them on every page of the PDF report (optional).</p>
+        <div>
+          <h3 class="modal-title" id="pdfTitle">PDF report</h3>
+          <p class="modal-subtitle">Add details to show on every page, or leave them blank.</p>
         </div>
-        <button id="btnPdfModalClose" class="modal-close" title="Close modal">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
+        <button id="btnPdfModalClose" class="icon-btn" aria-label="Close"><svg class="icon"><use href="#i-close"/></svg></button>
       </div>
-
       <div class="modal-body">
-        <div class="form-group">
-          <label class="form-label" for="pdfName">Name</label>
-          <input type="text" id="pdfName" class="form-input" placeholder="Enter your name" autocomplete="name">
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="pdfPhone">Phone</label>
-          <input type="tel" id="pdfPhone" class="form-input" placeholder="Enter your phone number" autocomplete="tel">
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="pdfAddress">Address</label>
-          <input type="text" id="pdfAddress" class="form-input" placeholder="Enter your address" autocomplete="street-address">
-        </div>
+        <label class="form-label" for="pdfName">Name</label>
+        <input type="text" id="pdfName" class="form-input" placeholder="Anita Sharma" autocomplete="name">
+        <label class="form-label" for="pdfPhone">Phone</label>
+        <input type="tel" id="pdfPhone" class="form-input" placeholder="+91 98765 43210" autocomplete="tel">
+        <label class="form-label" for="pdfAddress">Address</label>
+        <input type="text" id="pdfAddress" class="form-input" placeholder="Plot 14, Sector 21, Gurugram" autocomplete="street-address">
       </div>
-
       <div class="modal-footer">
-        <button id="btnPdfModalSkip" class="btn btn-secondary">Skip & Generate</button>
-        <button id="btnPdfModalGenerate" class="btn btn-primary">Generate PDF</button>
+        <button id="btnPdfModalSkip" class="btn btn-secondary">Skip details</button>
+        <button id="btnPdfModalGenerate" class="btn btn-primary">Create PDF</button>
       </div>
     </div>
   </div>
+
+  <div class="toast-stack" id="toastStack" aria-live="polite"></div>
 
   <!-- Vendor: Local client-side jsPDF for offline report generation -->
   <script src="js/vendor/jspdf.umd.min.js"></script>
