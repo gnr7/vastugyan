@@ -13,7 +13,7 @@ const polygon = [
 const centroid = calculatePolygonCentroid(polygon);
 const grid = generate9x9VastuGrid(polygon, centroid, 0);
 const devtas = computeDevtaSpatialFields(grid);
-const gates = calculate32EntranceGates(grid, devtas);
+const gates = calculate32EntranceGates(polygon, centroid, 0, devtas);
 
 console.log('Total gates generated:', gates.length);
 console.log('North gates:', gates.filter(g => g.category === 'outer_north').map(g => g.code));
@@ -29,6 +29,6 @@ console.log('Auspicious codes:', assessment.auspiciousCodes);
 // Verify with 30 degree rotation
 const grid30 = generate9x9VastuGrid(polygon, centroid, 30);
 const devtas30 = computeDevtaSpatialFields(grid30);
-const gates30 = calculate32EntranceGates(grid30, devtas30);
+const gates30 = calculate32EntranceGates(polygon, centroid, 30, devtas30);
 console.log('Rotated 30deg total gates:', gates30.length);
 console.log('North normal at 30deg:', gates30[0].normal);

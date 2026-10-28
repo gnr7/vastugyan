@@ -1,5 +1,5 @@
 /**
- * VastuGrid — Pure Functional Geometry Engine
+ * Vastu Mandala Studio — Pure Functional Geometry Engine
  */
 
 // Euclidean distance between two points
@@ -193,6 +193,171 @@ export const generate9x9VastuGrid = (points, centroid, angleDeg = 0) => {
     centroid,
     angleDeg
   };
+};
+
+// Signed Shoelace area: positive means the vertices run clockwise on screen (y-down canvas)
+export const calculateSignedArea = (points) => {
+  let sum = 0;
+  for (let i = 0; i < points.length; i++) {
+    const current = points[i];
+    const next = points[(i + 1) % points.length];
+    sum += (current.x * next.y) - (next.x * current.y);
+  }
+  return sum / 2;
+};
+
+// Sutherland–Hodgman clip of any polygon (convex or concave) against a convex clip polygon.
+// The area of the result is exact even when a concave subject yields degenerate bridging edges.
+export const clipPolygonByConvex = (subject, clip) => {
+  if (!subject || subject.length < 3 || !clip || clip.length < 3) return [];
+
+  const orientation = Math.sign(calculateSignedArea(clip)) || 1;
+  const isInside = (p, a, b) => orientation * ((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)) >= 0;
+  const intersect = (p, q, a, b) => {
+    const d = (p.x - q.x) * (a.y - b.y) - (p.y - q.y) * (a.x - b.x);
+    if (Math.abs(d) < 1e-12) return { x: q.x, y: q.y };
+    const t = ((p.x - a.x) * (a.y - b.y) - (p.y - a.y) * (a.x - b.x)) / d;
+    return { x: p.x + t * (q.x - p.x), y: p.y + t * (q.y - p.y) };
+  };
+
+  let output = subject;
+  for (let i = 0; i < clip.length && output.length > 0; i++) {
+    const a = clip[i];
+    const b = clip[(i + 1) % clip.length];
+    const input = output;
+    output = [];
+    for (let j = 0; j < input.length; j++) {
+      const current = input[j];
+      const prev = input[(j + input.length - 1) % input.length];
+      const currentIn = isInside(current, a, b);
+      const prevIn = isInside(prev, a, b);
+      if (currentIn) {
+        if (!prevIn) output.push(intersect(prev, current, a, b));
+        output.push(current);
+      } else if (prevIn) {
+        output.push(intersect(prev, current, a, b));
+      }
+    }
+  }
+  return output;
+};
+
+// Farthest point where a ray from origin (unit direction dir) crosses the polygon boundary.
+// Returns { point, edgeIndex, t, dist } or null when the ray misses every edge.
+export const rayPolygonHit = (points, origin, dir) => {
+  let best = null;
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    const ex = b.x - a.x;
+    const ey = b.y - a.y;
+    const denom = dir.x * ey - dir.y * ex;
+    if (Math.abs(denom) < 1e-12) continue;
+    const ox = a.x - origin.x;
+    const oy = a.y - origin.y;
+    const dist = (ox * ey - oy * ex) / denom;  // along the ray
+    const t = (ox * dir.y - oy * dir.x) / denom; // along the edge
+    if (dist > 1e-9 && t >= -1e-9 && t <= 1 + 1e-9 && (!best || dist > best.dist)) {
+      best = {
+        point: { x: origin.x + dir.x * dist, y: origin.y + dir.y * dist },
+        edgeIndex: i,
+        t: Math.min(1, Math.max(0, t)),
+        dist
+      };
+    }
+  }
+  return best;
+};
+
+// Boundary path between two hits on the polygon, walking forward or backward along the vertex order
+export const boundaryPathBetween = (points, hitA, hitB, forward) => {
+  const n = points.length;
+  const path = [hitA.point];
+  let edge = hitA.edgeIndex;
+
+  if (edge === hitB.edgeIndex && (forward ? hitB.t >= hitA.t : hitB.t <= hitA.t)) {
+    path.push(hitB.point);
+    return path;
+  }
+
+  for (let step = 0; step < n; step++) {
+    if (forward) {
+      edge = (edge + 1) % n;
+      path.push(points[edge]);
+    } else {
+      path.push(points[edge]);
+      edge = (edge - 1 + n) % n;
+    }
+    if (edge === hitB.edgeIndex) break;
+  }
+  path.push(hitB.point);
+  return path;
+};
+
+// Convex hull (Andrew's monotone chain)
+const convexHull = (points) => {
+  const sorted = [...points].sort((a, b) => (a.x - b.x) || (a.y - b.y));
+  const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const lower = [];
+  for (const p of sorted) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  const upper = [];
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const p = sorted[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  return lower.slice(0, -1).concat(upper.slice(0, -1));
+};
+
+// Orientation of the plot's walls: angle (0–90°) of the minimum-area rectangle around the polygon
+export const calculatePlotOrientation = (points) => {
+  if (!points || points.length < 3) return 0;
+  const hull = convexHull(points);
+  let bestAngle = 0;
+  let bestArea = Infinity;
+
+  for (let i = 0; i < hull.length; i++) {
+    const a = hull[i];
+    const b = hull[(i + 1) % hull.length];
+    const edgeAngle = Math.atan2(b.y - a.y, b.x - a.x);
+    const cos = Math.cos(-edgeAngle);
+    const sin = Math.sin(-edgeAngle);
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const p of hull) {
+      const x = p.x * cos - p.y * sin;
+      const y = p.x * sin + p.y * cos;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    const area = (maxX - minX) * (maxY - minY);
+    if (area < bestArea - 1e-9) {
+      bestArea = area;
+      bestAngle = edgeAngle;
+    }
+  }
+
+  const deg = (bestAngle * 180) / Math.PI;
+  return ((deg % 90) + 90) % 90;
+};
+
+// Wall-aligned grid angle closest to the North rotation, so the grid's top side faces nearest North
+export const nearestWallAlignedAngle = (wallAngleDeg, northDeg) => {
+  let best = wallAngleDeg;
+  let bestDiff = Infinity;
+  for (let k = 0; k < 4; k++) {
+    const candidate = (wallAngleDeg + k * 90) % 360;
+    const diff = Math.abs(((candidate - northDeg + 540) % 360) - 180);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = candidate;
+    }
+  }
+  return best;
 };
 
 // Find closest vertex within a screen pixel tolerance radius

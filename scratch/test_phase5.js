@@ -47,7 +47,7 @@ const points = [
 ];
 const grid = generate9x9VastuGrid(points, { x: 400, y: 300 }, 15);
 const devtas = computeDevtaSpatialFields(grid);
-const gates = calculate32EntranceGates(grid, devtas);
+const gates = calculate32EntranceGates(points, { x: 400, y: 300 }, 15, devtas);
 
 console.log(`Calculated Entrance Gates count: ${gates.length}`);
 if (gates.length !== 32) {

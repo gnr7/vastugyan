@@ -1,5 +1,5 @@
 /* ==========================================================================
-   VastuGrid — Minimalist Google UI Flat Design System
+   Vastu Mandala Studio — Minimalist Google UI Flat Design System
    ========================================================================== */
 
 :root {
@@ -1148,3 +1148,33 @@ input:checked + .slider::before {
 
 
 
+
+/* Set Scale & real-unit readouts */
+.scale-status {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-secondary, #5f6368);
+  line-height: 1.4;
+}
+
+.scale-status.is-set {
+  color: #137333;
+  font-weight: 500;
+}
+
+.scale-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.scale-input-row .form-input {
+  flex: 1;
+}
+
+.scale-input-row .scale-unit-select {
+  flex: 0 0 104px;
+}
+
+.sidebar-section .rotation-inputs-row + .toggle-item {
+  margin-top: 12px;
+}

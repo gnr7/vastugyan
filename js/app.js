@@ -1,5 +1,5 @@
 /**
- * VastuGrid — Application Entry Point & UI Controller
+ * Vastu Mandala Studio — Application Entry Point & UI Controller
  */
 
 import {
@@ -13,10 +13,19 @@ import {
   clearBoundary,
   resetAll,
   undoAction,
-  redoAction
+  redoAction,
+  setGridAlign,
+  setCalibrationMode,
+  applyCalibration
 } from './state.js';
 import { CanvasController, computeFitViewport } from './canvas.js';
-import { calculateAreaMetrics, calculatePositiveLandEnergy } from './analysis.js';
+import {
+  calculateAreaMetrics,
+  calculatePositiveLandEnergy,
+  calculatePanchTatvaSummary,
+  formatArea,
+  formatLength
+} from './analysis.js';
 import { exportCanvasToPng, generatePdfReport } from './export.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -48,6 +57,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnResetRotation = document.getElementById('btnResetRotation');
   const compassDial = document.getElementById('compassDial');
   const compassDegDisplay = document.getElementById('compassDegDisplay');
+  const toggleGridWalls = document.getElementById('toggleGridWalls');
+
+  // Set Scale controls
+  const btnSetScale = document.getElementById('btnSetScale');
+  const scaleBanner = document.getElementById('scaleBanner');
+  const btnCancelScale = document.getElementById('btnCancelScale');
+  const scaleModalBackdrop = document.getElementById('scaleModalBackdrop');
+  const scaleModalSubtitle = document.getElementById('scaleModalSubtitle');
+  const scaleLength = document.getElementById('scaleLength');
+  const scaleUnit = document.getElementById('scaleUnit');
+  const btnScaleModalApply = document.getElementById('btnScaleModalApply');
+  const btnScaleModalCancel = document.getElementById('btnScaleModalCancel');
+  const btnScaleModalClose = document.getElementById('btnScaleModalClose');
 
   // Layer switches
   const toggles = {
@@ -166,6 +188,48 @@ document.addEventListener('DOMContentLoaded', () => {
   btnResetRotation.addEventListener('click', () => {
     updateRotationUI(0);
   });
+
+  if (toggleGridWalls) {
+    toggleGridWalls.addEventListener('change', (e) => {
+      store.setState(setGridAlign(e.target.checked ? 'walls' : 'north'));
+    });
+  }
+
+  // 5b. Set Scale: pick two points on the plan, then enter their real distance
+  const closeScaleModal = () => {
+    if (scaleModalBackdrop) scaleModalBackdrop.style.display = 'none';
+  };
+  const cancelScale = () => {
+    closeScaleModal();
+    store.setState(setCalibrationMode(false));
+  };
+  const submitScale = () => {
+    const length = parseFloat(scaleLength.value);
+    if (!(length > 0)) {
+      scaleLength.focus();
+      return;
+    }
+    closeScaleModal();
+    store.setState(applyCalibration(length, scaleUnit.value));
+  };
+
+  if (btnSetScale) {
+    btnSetScale.addEventListener('click', () => {
+      const state = store.getState();
+      emptyState.style.display = 'none';
+      store.setState(setCalibrationMode(!state.isCalibrating));
+    });
+  }
+  if (btnCancelScale) btnCancelScale.addEventListener('click', cancelScale);
+  if (btnScaleModalCancel) btnScaleModalCancel.addEventListener('click', cancelScale);
+  if (btnScaleModalClose) btnScaleModalClose.addEventListener('click', cancelScale);
+  if (btnScaleModalApply) btnScaleModalApply.addEventListener('click', submitScale);
+  if (scaleLength) {
+    scaleLength.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') submitScale();
+      if (e.key === 'Escape') cancelScale();
+    });
+  }
 
   // 6. Layer Toggles Event Binding
   Object.entries(toggles).forEach(([layerKey, checkbox]) => {
@@ -338,6 +402,27 @@ document.addEventListener('DOMContentLoaded', () => {
     // Sync Rotation values and compass dial
     const deg = state.rotation;
     const formattedDeg = `${Math.round(deg * 10) / 10}°`;
+    if (toggleGridWalls && toggleGridWalls.checked !== (state.gridAlign === 'walls')) {
+      toggleGridWalls.checked = state.gridAlign === 'walls';
+    }
+
+    // Sync Set Scale banner and the length dialog (opens once both points are picked)
+    if (btnSetScale) btnSetScale.classList.toggle('active', state.isCalibrating);
+    if (scaleBanner) scaleBanner.style.display = state.isCalibrating && state.calibrationPoints.length < 2 ? 'flex' : 'none';
+    if (scaleModalBackdrop && state.isCalibrating && state.calibrationPoints.length === 2
+      && scaleModalBackdrop.style.display !== 'flex') {
+      const [a, b] = state.calibrationPoints;
+      const pixels = Math.hypot(b.x - a.x, b.y - a.y);
+      if (scaleModalSubtitle) {
+        scaleModalSubtitle.textContent = `Enter the real length of the line you drew (${Math.round(pixels)} px on the plan).`;
+      }
+      if (state.calibration) {
+        scaleUnit.value = state.calibration.unit;
+      }
+      scaleLength.value = '';
+      scaleModalBackdrop.style.display = 'flex';
+      setTimeout(() => scaleLength.focus(), 50);
+    }
     rotationBadge.textContent = formattedDeg;
     compassDegDisplay.textContent = formattedDeg;
     if (document.activeElement !== rotationSlider) {
@@ -371,7 +456,8 @@ document.addEventListener('DOMContentLoaded', () => {
       emptyState.style.display = (!state.image && state.polygon.length === 0) ? 'flex' : 'none';
     }
 
-    // Update Live Metrics & Analysis
+    // Update Live Metrics & Analysis (real units once Set Scale is applied)
+    const cal = state.calibration;
     const areaData = calculateAreaMetrics(state.metrics);
     const valArea = document.getElementById('valArea');
     const valAreaBadge = document.getElementById('valAreaBadge');
@@ -381,32 +467,54 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (valArea) {
       valArea.textContent = areaData.hasClosedPlot
-        ? `${Math.round(areaData.plotArea).toLocaleString()} sq units`
-        : (state.polygon.length >= 3 && !state.isPolygonClosed ? 'Close plot to compute' : '0 sq units');
+        ? formatArea(areaData.plotArea, cal)
+        : (state.polygon.length >= 3 && !state.isPolygonClosed ? 'Close plot to compute' : formatArea(0, cal));
     }
     if (valAreaBadge) {
       valAreaBadge.textContent = areaData.hasClosedPlot
-        ? `${Math.round(areaData.plotArea).toLocaleString()} sq`
-        : '0 sq units';
+        ? formatArea(areaData.plotArea, cal)
+        : formatArea(0, cal);
     }
     if (valBrahmaArea) {
       valBrahmaArea.textContent = areaData.gridArea > 0
-        ? `${Math.round(areaData.brahmasthanArea).toLocaleString()} sq (${areaData.brahmasthanRatioPct}%)`
+        ? `${formatArea(areaData.brahmasthanArea, cal)} (${areaData.brahmasthanRatioPct}%)`
         : '—';
     }
     if (valPadaArea) {
       valPadaArea.textContent = areaData.gridArea > 0
-        ? `${Math.round(areaData.padaArea).toLocaleString()} sq`
+        ? formatArea(areaData.padaArea, cal)
         : '—';
     }
     if (valDimensions) {
-      valDimensions.textContent = state.metrics.bounds
-        ? `${Math.round(state.metrics.bounds.width)} × ${Math.round(state.metrics.bounds.height)}`
+      const grid = state.metrics.grid9x9;
+      valDimensions.textContent = grid
+        ? `${formatLength(grid.totalWidth, cal)} × ${formatLength(grid.totalHeight, cal)}`
         : '—';
     }
+    const valScale = document.getElementById('valScale');
+    if (valScale) {
+      valScale.textContent = cal
+        ? `Scale set: 1 ${cal.unit} = ${(1 / cal.realPerWorld).toFixed(2)} px on the plan`
+        : 'Scale not set — use Set Scale for real feet / metres';
+      valScale.classList.toggle('is-set', !!cal);
+    }
 
-    // Update Positive Land Energy Analysis (VastuGrid Authentic)
-    const landData = calculatePositiveLandEnergy(state.metrics);
+    // Update Panch Tatva balance from the real plot area in each element's zones
+    calculatePanchTatvaSummary(state.metrics.zones16).forEach((elem) => {
+      const segment = document.querySelector(`[data-element="${elem.id}"]`);
+      const pct = document.querySelector(`[data-element-pct="${elem.id}"]`);
+      const zonesLabel = document.querySelector(`[data-element-zones="${elem.id}"]`);
+      if (segment) {
+        segment.style.width = elem.hasData ? `${elem.percentage}%` : '20%';
+        segment.style.opacity = elem.hasData ? '1' : '0.35';
+        segment.title = `${elem.name}: ${elem.formattedPercentage}`;
+      }
+      if (pct) pct.textContent = elem.formattedPercentage;
+      if (zonesLabel) zonesLabel.textContent = elem.zones.join(', ');
+    });
+
+    // Update Positive Land Energy Analysis (needs Set Scale for real dimensions)
+    const landData = calculatePositiveLandEnergy(state.metrics, cal);
     const landEnergyBadge = document.getElementById('landEnergyBadge');
     const valLandIncome = document.getElementById('valLandIncome');
     const valLandIncomeFormula = document.getElementById('valLandIncomeFormula');
@@ -441,10 +549,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (valLandIncome) valLandIncome.textContent = landData.income.toFixed(2);
-      if (valLandIncomeFormula) valLandIncomeFormula.textContent = `Length: ${landData.length} × 8`;
+      if (valLandIncomeFormula) valLandIncomeFormula.textContent = `Length: ${landData.length} ft × 8`;
 
       if (valLandExpenditure) valLandExpenditure.textContent = landData.expenditure.toFixed(2);
-      if (valLandExpenditureFormula) valLandExpenditureFormula.textContent = `Breadth: ${landData.breadth} × 10.8`;
+      if (valLandExpenditureFormula) valLandExpenditureFormula.textContent = `Breadth: ${landData.breadth} ft × 10.8`;
 
       // Income vs Expenditure Comparison
       if (cardIncomeComparison) {
@@ -487,8 +595,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (tagLandVerdict) tagLandVerdict.textContent = landData.verdict.title;
       if (summaryLandVerdict) summaryLandVerdict.textContent = landData.verdict.summary;
     } else {
+      const needsScale = landData.verdict.code === 'NO_SCALE';
       if (landEnergyBadge) {
-        landEnergyBadge.textContent = 'No Plot';
+        landEnergyBadge.textContent = needsScale ? 'Needs Scale' : 'No Plot';
         landEnergyBadge.className = 'badge-value';
       }
       if (valLandIncome) valLandIncome.textContent = '0.00';
@@ -499,7 +608,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (cardIncomeComparison) cardIncomeComparison.className = 'energy-status-card';
       if (iconIncomeComparison) iconIncomeComparison.textContent = '—';
       if (titleIncomeComparison) titleIncomeComparison.textContent = 'Income vs Expenditure';
-      if (subIncomeComparison) subIncomeComparison.textContent = 'Close plot to evaluate financial balance';
+      if (subIncomeComparison) {
+        subIncomeComparison.textContent = needsScale
+          ? 'Set Scale to evaluate with real dimensions'
+          : 'Close plot to evaluate financial balance';
+      }
 
       if (cardEnergyPattern) cardEnergyPattern.className = 'energy-status-card';
       if (labelEnergyPattern) labelEnergyPattern.textContent = 'Energy Pattern (Remainder: —)';
@@ -514,8 +627,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (calcLengthProportion) calcLengthProportion.textContent = 'Length should be ≤ 2.5 × Breadth';
 
       if (cardLandVerdict) cardLandVerdict.className = 'energy-verdict-box verdict-neutral';
-      if (tagLandVerdict) tagLandVerdict.textContent = 'DRAW BOUNDARY';
-      if (summaryLandVerdict) summaryLandVerdict.textContent = 'Plot boundary required to calculate land energy indicators.';
+      if (tagLandVerdict) tagLandVerdict.textContent = needsScale ? 'SET SCALE' : 'DRAW BOUNDARY';
+      if (summaryLandVerdict) summaryLandVerdict.textContent = landData.verdict.summary;
     }
   });
 

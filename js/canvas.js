@@ -1,5 +1,5 @@
 /**
- * VastuGrid — Canvas Viewport & Pure Geometry Rendering Engine
+ * Vastu Mandala Studio — Canvas Viewport & Pure Geometry Rendering Engine
  */
 
 import { distance, findClosestVertex } from './geometry.js';
@@ -10,7 +10,8 @@ import {
   commitDragHistory,
   setHoverVertex,
   setDraggingVertex,
-  setCursorWorldPos
+  setCursorWorldPos,
+  addCalibrationPoint
 } from './state.js';
 
 // Pure coordinate transformation functions
@@ -527,6 +528,14 @@ export const draw32EntranceGates = (ctx, entranceGates32, scale, layers, angleDe
     }
   };
 
+  // Trace a gate's stretch of the real plot boundary
+  const traceGatePath = (gate) => {
+    const path = gate.path && gate.path.length >= 2 ? gate.path : [gate.outerEdgeStart, gate.outerEdgeEnd];
+    ctx.beginPath();
+    ctx.moveTo(path[0].x, path[0].y);
+    path.slice(1).forEach((pt) => ctx.lineTo(pt.x, pt.y));
+  };
+
   // 1. Draw perimeter edge segments and divider ticks
   entranceGates32.forEach((gate) => {
     if (!gate.outerEdgeStart || !gate.outerEdgeEnd) return;
@@ -536,18 +545,14 @@ export const draw32EntranceGates = (ctx, entranceGates32, scale, layers, angleDe
 
     // A. Ambient soft glow under auspicious gate segments
     if (gate.isAuspicious) {
-      ctx.beginPath();
-      ctx.moveTo(gate.outerEdgeStart.x, gate.outerEdgeStart.y);
-      ctx.lineTo(gate.outerEdgeEnd.x, gate.outerEdgeEnd.y);
+      traceGatePath(gate);
       ctx.strokeStyle = 'rgba(52, 168, 83, 0.22)';
       ctx.lineWidth = 7 / scale;
       ctx.stroke();
     }
 
     // B. Perimeter edge boundary stroke
-    ctx.beginPath();
-    ctx.moveTo(gate.outerEdgeStart.x, gate.outerEdgeStart.y);
-    ctx.lineTo(gate.outerEdgeEnd.x, gate.outerEdgeEnd.y);
+    traceGatePath(gate);
 
     if (gate.isAuspicious) {
       ctx.strokeStyle = '#1e8e3e'; // Google Green
@@ -558,11 +563,12 @@ export const draw32EntranceGates = (ctx, entranceGates32, scale, layers, angleDe
     }
     ctx.stroke();
 
-    // C. Divider tick marks at segment boundary points
-    [gate.outerEdgeStart, gate.outerEdgeEnd].forEach((pt) => {
+    // C. Divider tick marks at segment boundary points (pointing radially outward)
+    [[gate.outerEdgeStart, gate.startNormal], [gate.outerEdgeEnd, gate.endNormal]].forEach(([pt, tickDir]) => {
+      const dir = tickDir || normal;
       ctx.beginPath();
       ctx.moveTo(pt.x, pt.y);
-      ctx.lineTo(pt.x + normal.x * tickLen, pt.y + normal.y * tickLen);
+      ctx.lineTo(pt.x + dir.x * tickLen, pt.y + dir.y * tickLen);
       ctx.strokeStyle = gate.isAuspicious ? '#1e8e3e' : '#5f6368';
       ctx.lineWidth = (gate.isAuspicious ? 2.0 : 1.2) / scale;
       ctx.stroke();
@@ -676,6 +682,37 @@ export const drawMarmaSthan = (ctx, marmaSthan, scale, layers) => {
 };
 
 // Main Canvas Controller Class
+// Render the Set Scale reference line (while picking its two points)
+export const drawCalibration = (ctx, state) => {
+  if (!state.isCalibrating) return;
+  const scale = state.viewport.scale;
+  const pts = [...state.calibrationPoints];
+  if (pts.length === 1 && state.cursorWorldPos) pts.push(state.cursorWorldPos);
+  if (pts.length === 0) return;
+
+  ctx.save();
+  if (pts.length === 2) {
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    ctx.lineTo(pts[1].x, pts[1].y);
+    ctx.setLineDash([6 / scale, 4 / scale]);
+    ctx.strokeStyle = '#e37400';
+    ctx.lineWidth = 2.5 / scale;
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  state.calibrationPoints.forEach((pt) => {
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, 5 / scale, 0, Math.PI * 2);
+    ctx.fillStyle = '#e37400';
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5 / scale;
+    ctx.stroke();
+  });
+  ctx.restore();
+};
+
 export class CanvasController {
   constructor(canvasElement, store) {
     this.canvas = canvasElement;
@@ -732,6 +769,12 @@ export class CanvasController {
     const state = this.store.getState();
     const worldPos = this.getEventWorldPos(e);
     const scale = state.viewport.scale;
+
+    // 0. Set Scale mode: pick the two ends of a wall of known length
+    if (state.isCalibrating) {
+      if (e.button === 0) this.store.setState(addCalibrationPoint(worldPos));
+      return;
+    }
 
     // 1. Drawing mode: Click to add vertices or click near start to close
     if (state.isDrawingPolygon) {
@@ -804,6 +847,13 @@ export class CanvasController {
           y: nextY
         }
       }));
+      return;
+    }
+
+    // 3a. Set Scale rubberband
+    if (state.isCalibrating) {
+      this.store.setState(setCursorWorldPos(worldPos));
+      this.canvas.style.cursor = 'crosshair';
       return;
     }
 
@@ -975,7 +1025,7 @@ export class CanvasController {
 
     // 7. Render 45 Devtas Overlay & Labels
     if (state.metrics.devtaFields) {
-      draw45Devtas(ctx, state.metrics.devtaFields, state.viewport.scale, state.layers, state.rotation);
+      draw45Devtas(ctx, state.metrics.devtaFields, state.viewport.scale, state.layers, state.metrics.gridAngle);
     }
 
     // 8. Render 32 Perimeter Entrance Gates & Auspicious Highlights
@@ -990,6 +1040,7 @@ export class CanvasController {
 
     // 10. Render property boundary polygon & vertex handles
     drawPolygon(ctx, state);
+    drawCalibration(ctx, state);
 
     // 10. Render geometric centroid marker
     if (state.metrics.centroid) {

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VastuGrid — Professional Vastu Purusha Mandala & Zonal Engine</title>
+  <title>Vastu Mandala Studio — Vastu Purusha Mandala & Zonal Engine</title>
   <meta name="description" content="Open-source local Vastu analysis tool: 9x9 Vastu Purusha Mandala, 45 Devtas, 16 directional zones, and 32 perimeter entrance padas.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,7 +24,7 @@
             <line x1="3" y1="15" x2="21" y2="15"/>
           </svg>
           <div class="brand-info">
-            <span class="brand-title">VastuGrid</span>
+            <span class="brand-title">Vastu Mandala Studio</span>
             <span class="brand-badge">Open Source · Local</span>
           </div>
         </div>
@@ -46,6 +46,16 @@
             <polygon points="12 2 22 8.5 17 21 7 21 2 8.5 12 2"/>
           </svg>
           Draw Boundary
+        </button>
+
+        <button id="btnSetScale" class="btn btn-secondary" title="Click both ends of a wall, then enter its real length">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 17 17 3l4 4L7 21z"/>
+            <line x1="7" y1="13" x2="9" y2="15"/>
+            <line x1="10" y1="10" x2="12" y2="12"/>
+            <line x1="13" y1="7" x2="15" y2="9"/>
+          </svg>
+          Set Scale
         </button>
 
         <div class="header-divider"></div>
@@ -119,6 +129,13 @@
           <span class="drafting-dot"></span>
           <span class="drafting-text">Click to place vertices · Click point 0 or double-click to close</span>
           <button class="btn btn-primary btn-sm" id="btnFinishDraft">Done</button>
+        </div>
+
+        <!-- Floating Set Scale Banner (Visible while picking the reference wall) -->
+        <div class="drafting-banner" id="scaleBanner" style="display: none;">
+          <span class="drafting-dot"></span>
+          <span class="drafting-text">Set Scale: click both ends of a wall whose real length you know</span>
+          <button class="btn btn-secondary btn-sm" id="btnCancelScale">Cancel</button>
         </div>
 
         <!-- Empty state placeholder (visible when no plan loaded) -->
@@ -196,6 +213,16 @@
             </div>
             <button id="btnResetRotation" class="btn btn-flat btn-sm">Reset</button>
           </div>
+          <label class="toggle-item">
+            <div class="toggle-info">
+              <span class="toggle-label">Align Grid to Plot Walls</span>
+              <span class="toggle-sub">Off: 9×9 grid turns with North · On: grid stays on the walls</span>
+            </div>
+            <div class="switch">
+              <input type="checkbox" id="toggleGridWalls">
+              <span class="slider"></span>
+            </div>
+          </label>
         </div>
 
         <!-- Section: Analytical Overlays & Toggles -->
@@ -307,13 +334,13 @@
         <div class="sidebar-section">
           <div class="section-header">
             <span class="section-title">Plot Area & Metrics</span>
-            <span class="badge-value" id="valAreaBadge">0 sq units</span>
+            <span class="badge-value" id="valAreaBadge">0 sq px</span>
           </div>
 
           <div class="metrics-grid">
             <div class="metric-card">
               <span class="metric-title">Plot Area</span>
-              <span class="metric-value" id="valArea">0 sq units</span>
+              <span class="metric-value" id="valArea">0 sq px</span>
             </div>
             <div class="metric-card">
               <span class="metric-title">Brahmasthan (3×3)</span>
@@ -328,9 +355,10 @@
               <span class="metric-value" id="valDimensions">—</span>
             </div>
           </div>
+          <div class="scale-status" id="valScale">Scale not set — use Set Scale for real feet / metres</div>
         </div>
 
-        <!-- Section: Positive Land Energy Analysis (VastuGrid Authentic) -->
+        <!-- Section: Positive Land Energy Analysis -->
         <div class="sidebar-section land-energy-section" id="landEnergySection">
           <div class="section-header">
             <span class="section-title">
@@ -409,13 +437,13 @@
             <span class="badge-value">5 Elements</span>
           </div>
 
-          <!-- Stacked Segmented Progress Bar -->
-          <div class="elemental-bar" id="elementalBar" title="Elemental Distribution across 16 Zones">
-            <div class="elemental-segment seg-water" style="width: 18.75%" title="Water: 18.75%"></div>
-            <div class="elemental-segment seg-air" style="width: 18.75%" title="Air: 18.75%"></div>
-            <div class="elemental-segment seg-fire" style="width: 18.75%" title="Fire: 18.75%"></div>
-            <div class="elemental-segment seg-earth" style="width: 12.50%" title="Earth: 12.50%"></div>
-            <div class="elemental-segment seg-space" style="width: 31.25%" title="Space: 31.25%"></div>
+          <!-- Stacked Segmented Progress Bar (filled from real zone areas) -->
+          <div class="elemental-bar" id="elementalBar" title="Share of plot area in each element's zones">
+            <div class="elemental-segment seg-water" data-element="water" style="width: 20%"></div>
+            <div class="elemental-segment seg-air" data-element="air" style="width: 20%"></div>
+            <div class="elemental-segment seg-fire" data-element="fire" style="width: 20%"></div>
+            <div class="elemental-segment seg-earth" data-element="earth" style="width: 20%"></div>
+            <div class="elemental-segment seg-space" data-element="space" style="width: 20%"></div>
           </div>
 
           <!-- Elemental Distribution Legend / List -->
@@ -425,42 +453,43 @@
                 <span class="elem-dot dot-water"></span>
                 <span class="elem-name">Water (Jal)</span>
               </div>
-              <span class="elem-zones">N, NNE, NE</span>
-              <span class="elem-pct">18.8%</span>
+              <span class="elem-zones" data-element-zones="water">—</span>
+              <span class="elem-pct" data-element-pct="water">—</span>
             </div>
             <div class="elemental-row">
               <div class="elem-label">
                 <span class="elem-dot dot-air"></span>
                 <span class="elem-name">Air (Vayu)</span>
               </div>
-              <span class="elem-zones">ENE, E, ESE</span>
-              <span class="elem-pct">18.8%</span>
+              <span class="elem-zones" data-element-zones="air">—</span>
+              <span class="elem-pct" data-element-pct="air">—</span>
             </div>
             <div class="elemental-row">
               <div class="elem-label">
                 <span class="elem-dot dot-fire"></span>
                 <span class="elem-name">Fire (Agni)</span>
               </div>
-              <span class="elem-zones">SE, SSE, S</span>
-              <span class="elem-pct">18.8%</span>
+              <span class="elem-zones" data-element-zones="fire">—</span>
+              <span class="elem-pct" data-element-pct="fire">—</span>
             </div>
             <div class="elemental-row">
               <div class="elem-label">
                 <span class="elem-dot dot-earth"></span>
                 <span class="elem-name">Earth (Prithvi)</span>
               </div>
-              <span class="elem-zones">SSW, SW</span>
-              <span class="elem-pct">12.5%</span>
+              <span class="elem-zones" data-element-zones="earth">—</span>
+              <span class="elem-pct" data-element-pct="earth">—</span>
             </div>
             <div class="elemental-row">
               <div class="elem-label">
                 <span class="elem-dot dot-space"></span>
                 <span class="elem-name">Space (Akash)</span>
               </div>
-              <span class="elem-zones">WSW..NNW</span>
-              <span class="elem-pct">31.2%</span>
+              <span class="elem-zones" data-element-zones="space">—</span>
+              <span class="elem-pct" data-element-pct="space">—</span>
             </div>
           </div>
+          <div class="scale-status">Share of the plot's area in each element's zones</div>
         </div>
 
         <!-- Section: Entrance Gate Assessment -->
@@ -500,6 +529,42 @@
         </div>
       </aside>
     </main>
+  </div>
+
+  <!-- Set Scale Modal -->
+  <div id="scaleModalBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <h3 class="modal-title">Set Scale</h3>
+          <p class="modal-subtitle" id="scaleModalSubtitle">Enter the real length of the line you just drew.</p>
+        </div>
+        <button id="btnScaleModalClose" class="modal-close" title="Cancel">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="scaleLength">Real length</label>
+          <div class="scale-input-row">
+            <input type="number" id="scaleLength" class="form-input" min="0" step="0.1" placeholder="e.g. 40">
+            <select id="scaleUnit" class="form-input scale-unit-select">
+              <option value="ft">feet</option>
+              <option value="m">metres</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btnScaleModalCancel" class="btn btn-secondary">Cancel</button>
+        <button id="btnScaleModalApply" class="btn btn-primary">Apply Scale</button>
+      </div>
+    </div>
   </div>
 
   <!-- PDF Report Details Modal (Google UI Design) -->

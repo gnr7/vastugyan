@@ -1,7 +1,26 @@
 /**
- * VastuGrid — Analysis Panel, Elemental Distribution & Area Metrics Engine
+ * Vastu Mandala Studio — Analysis Panel, Elemental Distribution & Area Metrics Engine
  * Pure functional calculations for area proportions, Panch Tatva balance, and entrances.
  */
+
+import { ZONES_16_DATA } from './zones.js';
+
+const ELEMENT_IDS = { Water: 'water', Air: 'air', Fire: 'fire', Earth: 'earth', Space: 'space' };
+const zonesOfElement = (id) => ZONES_16_DATA.filter((z) => ELEMENT_IDS[z.element] === id).map((z) => z.id);
+
+export const FEET_PER_METRE = 3.28084;
+
+// Format a world (canvas) length in real units when Set Scale has been applied, else in pixels
+export const formatLength = (worldLength, calibration, digits = 1) => {
+  if (!calibration) return `${Math.round(worldLength)} px`;
+  return `${(worldLength * calibration.realPerWorld).toFixed(digits)} ${calibration.unit}`;
+};
+
+export const formatArea = (worldArea, calibration) => {
+  if (!calibration) return `${Math.round(worldArea).toLocaleString()} sq px`;
+  const real = worldArea * calibration.realPerWorld * calibration.realPerWorld;
+  return `${Math.round(real).toLocaleString()} sq ${calibration.unit}`;
+};
 
 // Panch Tatva (Five Elements) Constants
 export const PANCH_TATVA_DATA = [
@@ -11,9 +30,9 @@ export const PANCH_TATVA_DATA = [
     sanskrit: 'जल तत्व',
     color: '#1a73e8',
     bgTint: 'rgba(26, 115, 232, 0.12)',
-    zones: ['N', 'NNE', 'NE'],
+    zones: zonesOfElement('water'),
     significance: 'Clarity, opportunities, flow of wealth & healing',
-    directionRange: 'North to North-East'
+    directionRange: 'North-North-West to North-East'
   },
   {
     id: 'air',
@@ -21,7 +40,7 @@ export const PANCH_TATVA_DATA = [
     sanskrit: 'वायु तत्व',
     color: '#1e8e3e',
     bgTint: 'rgba(30, 142, 62, 0.12)',
-    zones: ['ENE', 'E', 'ESE'],
+    zones: zonesOfElement('air'),
     significance: 'Growth, social networking, expansion & joy',
     directionRange: 'East-North-East to East-South-East'
   },
@@ -31,7 +50,7 @@ export const PANCH_TATVA_DATA = [
     sanskrit: 'अग्नि तत्व',
     color: '#d93025',
     bgTint: 'rgba(217, 48, 37, 0.12)',
-    zones: ['SE', 'SSE', 'S'],
+    zones: zonesOfElement('fire'),
     significance: 'Cash liquidity, confidence, dynamic drive & fame',
     directionRange: 'South-East to South'
   },
@@ -41,7 +60,7 @@ export const PANCH_TATVA_DATA = [
     sanskrit: 'पृथ्वी तत्व',
     color: '#e37400',
     bgTint: 'rgba(227, 116, 0, 0.12)',
-    zones: ['SSW', 'SW'],
+    zones: zonesOfElement('earth'),
     significance: 'Stability, family bonds, skills & relationships',
     directionRange: 'South-South-West to South-West'
   },
@@ -51,9 +70,9 @@ export const PANCH_TATVA_DATA = [
     sanskrit: 'आकाश तत्व',
     color: '#5f6368',
     bgTint: 'rgba(95, 99, 104, 0.12)',
-    zones: ['WSW', 'W', 'WNW', 'NW', 'NNW'],
+    zones: zonesOfElement('space'),
     significance: 'Gains, manifestation, profits & banking support',
-    directionRange: 'West-South-West to North-North-West'
+    directionRange: 'West-South-West to North-West'
   }
 ];
 
@@ -98,18 +117,27 @@ export const calculateAreaMetrics = (metrics) => {
 };
 
 /**
- * Pure calculation of Panch Tatva (Five Elements) distribution breakdown
+ * Pure calculation of Panch Tatva (Five Elements) distribution breakdown.
+ * Shares are the real plot area falling in each element's zones (needs a closed plot).
+ * @param {Object} zones16 - Zones with per-zone `area` from calculateZoneAreas
  */
-export const calculatePanchTatvaSummary = () => {
-  const totalZones = 16;
+export const calculatePanchTatvaSummary = (zones16 = null) => {
+  const zones = zones16 && zones16.zones ? zones16.zones : [];
+  const hasAreas = zones.length > 0 && zones.every((z) => typeof z.area === 'number');
+  const totalArea = hasAreas ? zones.reduce((sum, z) => sum + z.area, 0) : 0;
+
   return PANCH_TATVA_DATA.map((elem) => {
-    const zoneCount = elem.zones.length;
-    const percentage = Math.round((zoneCount / totalZones) * 1000) / 10; // e.g. 18.8%
+    const area = hasAreas
+      ? zones.filter((z) => elem.zones.includes(z.id)).reduce((sum, z) => sum + z.area, 0)
+      : 0;
+    const percentage = totalArea > 0 ? Math.round((area / totalArea) * 1000) / 10 : 0;
     return {
       ...elem,
-      zoneCount,
+      zoneCount: elem.zones.length,
+      area,
+      hasData: totalArea > 0,
       percentage,
-      formattedPercentage: `${percentage}%`
+      formattedPercentage: totalArea > 0 ? `${percentage}%` : '—'
     };
   });
 };
@@ -151,66 +179,19 @@ export const calculateGateAssessment = (entranceGates32) => {
 };
 
 /**
- * Classical Remainder (Ayaadi / Yoni) Energy Pattern dictionary
- * Formula: (Length + Breadth) ÷ 8 → remainder
+ * Remainder energy pattern table: (Length + Breadth) ÷ 8 → remainder.
+ * Results follow the VastuGrid-style reading (remainder 4 = best); the classical Ayadi
+ * Yoni names are intentionally not used because that method computes and reads differently.
  */
 export const ENERGY_PATTERNS_DICT = {
-  0: {
-    yoni: 'Kaka (Crow)',
-    direction: 'North-East',
-    isPositive: false,
-    quality: 'Caution',
-    description: 'Mixed/Weak Energy (delays, unpredictability; remedial measures advised)'
-  },
-  1: {
-    yoni: 'Dhwaja (Flag)',
-    direction: 'East',
-    isPositive: true,
-    quality: 'Auspicious',
-    description: 'Positive Energy (success, sustained growth, fame & leadership)'
-  },
-  2: {
-    yoni: 'Dhooma (Smoke)',
-    direction: 'South-East',
-    isPositive: false,
-    quality: 'Inauspicious',
-    description: 'Negative Tendency (anxiety, conflicts, higher restlessness)'
-  },
-  3: {
-    yoni: 'Simha (Lion)',
-    direction: 'South',
-    isPositive: true,
-    quality: 'Auspicious',
-    description: 'Positive Energy (power, dynamic courage, victory & authority)'
-  },
-  4: {
-    yoni: 'Shwana / Vrishabha',
-    direction: 'South-West',
-    isPositive: true,
-    quality: 'Best',
-    description: 'Positive Energy: dhan, sukh, santan, progress'
-  },
-  5: {
-    yoni: 'Vrisha (Bull)',
-    direction: 'West',
-    isPositive: true,
-    quality: 'Auspicious',
-    description: 'Positive Energy (steady prosperity, financial stability & harmony)'
-  },
-  6: {
-    yoni: 'Khar (Donkey)',
-    direction: 'North-West',
-    isPositive: false,
-    quality: 'Inauspicious',
-    description: 'Negative Tendency (instability, frequent hurdles & fluctuating gains)'
-  },
-  7: {
-    yoni: 'Gaja (Elephant)',
-    direction: 'North',
-    isPositive: true,
-    quality: 'Best',
-    description: 'Positive Energy: abundant wealth, royal status & spiritual wisdom'
-  }
+  0: { isPositive: false, quality: 'Caution', description: 'Mixed/Weak Energy (delays, unpredictability; remedial measures advised)' },
+  1: { isPositive: true, quality: 'Auspicious', description: 'Positive Energy (success, sustained growth, fame & leadership)' },
+  2: { isPositive: false, quality: 'Inauspicious', description: 'Negative Tendency (anxiety, conflicts, higher restlessness)' },
+  3: { isPositive: true, quality: 'Auspicious', description: 'Positive Energy (power, dynamic courage, victory & authority)' },
+  4: { isPositive: true, quality: 'Best', description: 'Positive Energy: dhan, sukh, santan, progress' },
+  5: { isPositive: true, quality: 'Auspicious', description: 'Positive Energy (steady prosperity, financial stability & harmony)' },
+  6: { isPositive: false, quality: 'Inauspicious', description: 'Negative Tendency (instability, frequent hurdles & fluctuating gains)' },
+  7: { isPositive: true, quality: 'Best', description: 'Positive Energy: abundant wealth, royal status & spiritual wisdom' }
 };
 
 /**
@@ -222,10 +203,13 @@ export const ENERGY_PATTERNS_DICT = {
  * 4. Energy Pattern Remainder: (Length + Breadth) ÷ 8
  * 5. Length Proportion Ratio: Length / Breadth (<= 2.5)
  * 6. Final Land Verdict
+ * Length and Breadth are in feet, taken from the grid's bounding dimensions and Set Scale.
  * @param {Object} metrics - Plot metrics
+ * @param {Object} calibration - Set Scale result { realPerWorld, unit }
  */
-export const calculatePositiveLandEnergy = (metrics) => {
-  if (!metrics || !metrics.bounds || !metrics.area || metrics.area <= 0) {
+export const calculatePositiveLandEnergy = (metrics, calibration = null) => {
+  const hasPlot = !!(metrics && metrics.bounds && metrics.area > 0);
+  if (!hasPlot || !calibration) {
     return {
       isActive: false,
       length: 0,
@@ -238,13 +222,21 @@ export const calculatePositiveLandEnergy = (metrics) => {
       ratio: 0,
       maxAllowedLength: 0,
       ratioGood: false,
-      verdict: {
-        code: 'NO_PLOT',
-        title: 'NO CLOSED PLOT',
-        badgeClass: 'verdict-neutral',
-        isRecommended: false,
-        summary: 'Draw and close a property boundary to compute land energy.'
-      }
+      verdict: hasPlot
+        ? {
+          code: 'NO_SCALE',
+          title: 'SET SCALE',
+          badgeClass: 'verdict-neutral',
+          isRecommended: false,
+          summary: 'Use Set Scale and enter one wall\'s real length — land energy needs real dimensions.'
+        }
+        : {
+          code: 'NO_PLOT',
+          title: 'NO CLOSED PLOT',
+          badgeClass: 'verdict-neutral',
+          isRecommended: false,
+          summary: 'Draw and close a property boundary to compute land energy.'
+        }
     };
   }
 
@@ -255,10 +247,10 @@ export const calculatePositiveLandEnergy = (metrics) => {
   const rawL = Math.max(rawW, rawH);
   const rawB = Math.min(rawW, rawH);
 
-  // Convert canvas pixel units into clean, usable plot units
-  const divisor = rawL >= 120 ? 10 : (rawL >= 30 ? 1 : 0.1);
-  const length = Math.round((rawL / divisor) * 10) / 10;
-  const breadth = Math.max(1, Math.round((rawB / divisor) * 10) / 10);
+  // Convert canvas units to real feet using the Set Scale calibration
+  const feetPerWorld = calibration.realPerWorld * (calibration.unit === 'm' ? FEET_PER_METRE : 1);
+  const length = Math.round(rawL * feetPerWorld * 10) / 10;
+  const breadth = Math.max(0.1, Math.round(rawB * feetPerWorld * 10) / 10);
 
   // 1. Income Potential: Length × 8
   const income = Math.round(length * 8 * 100) / 100;

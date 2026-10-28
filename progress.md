@@ -1,4 +1,4 @@
-# VastuGrid Open-Source Web Application — Development Progress
+# Vastu Mandala Studio — Development Progress
 
 ## Project Overview
 Open-source, local-first Vastu Shastra analysis web application inspired by professional tools like VastuGrid. Built with a clean, Google UI flat aesthetic, modular functional JavaScript, and pure geometric canvas rendering.
@@ -20,7 +20,7 @@ Open-source, local-first Vastu Shastra analysis web application inspired by prof
 - **45 Devtas Distribution**:
   - **32 Outer Devtas** (occupying the 32 perimeter padas, 8 per direction):
     - *East*: Shikhi (NE), Parjanya, Jayanta, Indra, Surya, Satya, Bhrisha, Antariksha
-    - *South*: Agni (SE), Poosha, Vitatha, Brihatkshata, Yama, Gandharva, Bhringaraja, Mriga
+    - *South*: Anila (SE), Poosha, Vitatha, Brihatkshata, Yama, Gandharva, Bhringaraja, Mriga
     - *West*: Pitri (SW), Dauvarika, Sugriva, Pushpadanta, Varuna, Asura, Shosha, Papayakshma
     - *North*: Roga (NW), Naga/Mukhya, Bhallat, Soma, Bhujaga, Aditi, Diti
   - **13 Inner Devtas**:
@@ -145,6 +145,15 @@ Open-source, local-first Vastu Shastra analysis web application inspired by prof
   - **PDF Report Integration**: Included Positive Land Energy findings in Executive Vastu Insights on Page 1 of the generated PDF report.
   - **Verified live in browser & unit tests**: Tested across standard rectangle ($60 \times 40$), square ($40 \times 40$), and elongated plots ($90 \times 20$), verifying dynamic recalculation on rotation, drafting, and undo/redo.
 
+- [x] **Gap Fixes after Review** (COMPLETED, 2026-10-28)
+  - **App renamed** to *Vastu Mandala Studio* (title, logo, PDF, export filenames) so it no longer uses the commercial product's name.
+  - **Set Scale tool** (`#btnSetScale`): click both ends of a wall, enter its real length in feet or metres. Areas, pada size and grid dimensions show real sq ft / sq m everywhere (sidebar + PDF). The scale survives Clear Boundary and undo/redo; Reset All clears it. State: `calibration`, `isCalibrating`, `calibrationPoints`; actions `setCalibrationMode`, `addCalibrationPoint`, `applyCalibration`.
+  - **Positive Land Energy uses real feet**: the old pixels ÷ 10 guess is gone. Until a scale is set the card shows *SET SCALE*. Metre scales are converted to feet. The remainder table keeps the VastuGrid-style results (4 = best) but drops the borrowed Yoni names (Shwana, Gaja…), because the classical Ayadi method computes and reads differently.
+  - **Real Panch Tatva**: each 22.5° zone now stores the real plot area inside it (`calculateZoneAreas`, Sutherland–Hodgman clip of the plot against each zone wedge). Element shares are the sum of their zones' areas, so they change with the plot's shape. Element zone lists now come from `ZONES_16_DATA`, so the panel matches the map colours (NNW is Water, NW is Space). This is also the data the 16 Bar Chart needs.
+  - **32 entrances by compass angle**: 32 slices of 11.25° from the centroid, rotated with North (N1 starts at NW, N4/N5 either side of North, E1 at NE…). Each slice is drawn where it meets the **real plot boundary** (follows corners and L-shape notches) instead of 8 equal pieces of the bounding box. Gate names still come from the 32 outer Devtas.
+  - **Grid alignment toggle** (`#toggleGridWalls`, state `gridAlign`): *Off* keeps the old behaviour (9×9 grid, Devtas and Marma turn with North). *On* lays the grid on the plot's walls (minimum-area rectangle), choosing the side that faces nearest North as the grid's North side. Zones and entrances always follow North. `metrics.gridAngle` holds the angle the grid was laid at.
+  - **Tests**: `scratch/test_gap_fixes.js` (19 assertions: zone areas sum to the plot area, gates tile the perimeter exactly and lie on the boundary, 60×40 ft gives 480/432/remainder 4, metre conversion, wall alignment on a 20° tilted plot). Older test scripts updated to the new function signatures. `test_phase7.js` still fails in Node (jsPDF needs a browser); this was already failing before these fixes.
+
 ---
 
 ## Current Status
@@ -162,6 +171,7 @@ Open-source, local-first Vastu Shastra analysis web application inspired by prof
   11. Instant Clear Boundary & Complete Reset All Controls
   12. Improved 32 Entrance Padas Visual Style (Segmented Perimeter, Dividers, Outward Badges)
   13. Positive Land Energy Analysis Module (Income Potential, Expenditure Tendency, Remainder Method, Ratio & Final Verdict)
+  14. Gap fixes: Set Scale & real units, real-area Panch Tatva, angular 32 entrances on real walls, grid alignment toggle, rename
 - **Awaiting User Review & Approval** before proceeding to next features (Vithi Mandal / 16 Bar Chart).
 
 

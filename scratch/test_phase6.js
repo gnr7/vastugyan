@@ -2,11 +2,14 @@ import { calculateAreaMetrics, calculatePanchTatvaSummary, calculateGateAssessme
 import { generate9x9VastuGrid } from '../js/geometry.js';
 import { computeDevtaSpatialFields } from '../js/devtas.js';
 import { calculate32EntranceGates } from '../js/zones.js';
+import { recalculateMetrics } from '../js/state.js';
 
 console.log('Testing Phase 6: Analysis Panel & Elemental Distribution...');
 
 // 1. Verify Panch Tatva Data & Summary
-const tatvaSummary = calculatePanchTatvaSummary();
+// Panch Tatva shares are real plot area per element, so they need a closed plot
+const tatvaPlot = [{ x: 0, y: 0 }, { x: 600, y: 0 }, { x: 600, y: 400 }, { x: 0, y: 400 }];
+const tatvaSummary = calculatePanchTatvaSummary(recalculateMetrics(tatvaPlot, true, 0).zones16);
 console.log(`Panch Tatva elements count: ${tatvaSummary.length}`);
 if (tatvaSummary.length !== 5) {
   throw new Error(`Expected 5 elements, got ${tatvaSummary.length}`);
@@ -52,7 +55,7 @@ const points = [
 ];
 const grid = generate9x9VastuGrid(points, { x: 400, y: 400 }, 0);
 const devtas = computeDevtaSpatialFields(grid);
-const gates = calculate32EntranceGates(grid, devtas);
+const gates = calculate32EntranceGates(points, { x: 400, y: 400 }, 0, devtas);
 const gateAssessment = calculateGateAssessment(gates);
 
 console.log(`Total Gates assessed: ${gateAssessment.totalCount}`);

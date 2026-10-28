@@ -3,10 +3,13 @@ import {
   calculatePolygonCentroid,
   calculateBoundingBox,
   generate9x9VastuGrid,
-  calculateMarmaSthan
+  calculateMarmaSthan,
+  calculatePlotOrientation,
+  nearestWallAlignedAngle,
+  distance
 } from './geometry.js';
 import { computeDevtaSpatialFields } from './devtas.js';
-import { calculate16DirectionalZones, calculate32EntranceGates } from './zones.js';
+import { calculate16DirectionalZones, calculateZoneAreas, calculate32EntranceGates } from './zones.js';
 
 // Initial state factory function
 export const createInitialState = () => Object.freeze({
@@ -27,6 +30,10 @@ export const createInitialState = () => Object.freeze({
   hoverVertexIndex: null,
   cursorWorldPos: null,       // current mouse position in world coordinates
   rotation: 0,                // 0 - 360 degrees
+  gridAlign: 'north',         // 'north': 9x9 grid turns with North · 'walls': grid stays on the plot's walls
+  calibration: null,          // { realPerWorld, unit: 'ft' | 'm', realLength } once Set Scale is applied
+  isCalibrating: false,
+  calibrationPoints: Object.freeze([]), // up to 2 world points of the reference wall
   layers: Object.freeze({
     grid9x9: true,
     brahmasthan: true,
@@ -45,7 +52,8 @@ export const createInitialState = () => Object.freeze({
     devtaFields: null,        // 45 Devtas spatial fields
     zones16: null,            // 16 Directional Zones
     entranceGates32: null,    // 32 Perimeter Entrance Gates
-    marmaSthan: null          // Marma Sthan diagonal lines and nodes
+    marmaSthan: null,         // Marma Sthan diagonal lines and nodes
+    gridAngle: 0              // angle the 9x9 grid is laid at (North rotation or wall-aligned)
   }),
   history: Object.freeze({
     past: Object.freeze([]),    // array of previous { polygon, isPolygonClosed } snapshots
@@ -107,7 +115,7 @@ export const setRotation = (deg) => (state) => {
   return {
     ...state,
     rotation: normalizedDeg,
-    metrics: recalculateMetrics(state.polygon, state.isPolygonClosed, normalizedDeg)
+    metrics: recalculateMetrics(state.polygon, state.isPolygonClosed, normalizedDeg, state.gridAlign)
   };
 };
 
@@ -120,7 +128,7 @@ export const toggleLayer = (layerName, isVisible) => (state) => ({
 });
 
 // Pure calculation of metrics, 9x9 grid, Devtas, and 16 Zones from polygon and rotation
-export const recalculateMetrics = (points, isClosed, rotation = 0) => {
+export const recalculateMetrics = (points, isClosed, rotation = 0, gridAlign = 'north') => {
   if (!points || points.length === 0) {
     return Object.freeze({
       area: 0,
@@ -130,22 +138,29 @@ export const recalculateMetrics = (points, isClosed, rotation = 0) => {
       devtaFields: null,
       zones16: null,
       entranceGates32: null,
-      marmaSthan: null
+      marmaSthan: null,
+      gridAngle: rotation
     });
   }
 
+  const hasPlot = isClosed && points.length >= 3;
   const area = isClosed ? calculatePolygonArea(points) : 0;
   const centroid = calculatePolygonCentroid(points);
   const bounds = calculateBoundingBox(points);
-  const grid9x9 = (isClosed && points.length >= 3 && centroid)
-    ? generate9x9VastuGrid(points, centroid, rotation)
-    : null;
+
+  // The grid follows North, or the plot's walls (turned to the side facing nearest North)
+  const gridAngle = (hasPlot && gridAlign === 'walls')
+    ? nearestWallAlignedAngle(calculatePlotOrientation(points), rotation)
+    : rotation;
+
+  const grid9x9 = (hasPlot && centroid) ? generate9x9VastuGrid(points, centroid, gridAngle) : null;
   const devtaFields = grid9x9 ? computeDevtaSpatialFields(grid9x9) : null;
-  const zones16 = centroid ? calculate16DirectionalZones(centroid, bounds, rotation, grid9x9) : null;
-  const entranceGates32 = (grid9x9 && devtaFields) ? calculate32EntranceGates(grid9x9, devtaFields) : null;
-  const marmaSthan = (isClosed && points.length >= 3 && centroid)
-    ? calculateMarmaSthan(points, centroid, rotation)
+  const zonesBase = centroid ? calculate16DirectionalZones(centroid, bounds, rotation, grid9x9) : null;
+  const zones16 = (hasPlot && zonesBase) ? calculateZoneAreas(zonesBase, points) : zonesBase;
+  const entranceGates32 = (hasPlot && centroid)
+    ? calculate32EntranceGates(points, centroid, rotation, devtaFields)
     : null;
+  const marmaSthan = (hasPlot && centroid) ? calculateMarmaSthan(points, centroid, gridAngle) : null;
 
   return Object.freeze({
     area,
@@ -155,8 +170,53 @@ export const recalculateMetrics = (points, isClosed, rotation = 0) => {
     devtaFields,
     zones16,
     entranceGates32,
-    marmaSthan
+    marmaSthan,
+    gridAngle
   });
+};
+
+export const setGridAlign = (mode) => (state) => {
+  const gridAlign = mode === 'walls' ? 'walls' : 'north';
+  if (gridAlign === state.gridAlign) return state;
+  return {
+    ...state,
+    gridAlign,
+    metrics: recalculateMetrics(state.polygon, state.isPolygonClosed, state.rotation, gridAlign)
+  };
+};
+
+// Set Scale: pick two points on a wall of known length, then enter that length
+export const setCalibrationMode = (isOn) => (state) => ({
+  ...state,
+  isCalibrating: isOn,
+  isDrawingPolygon: isOn ? false : state.isDrawingPolygon,
+  calibrationPoints: Object.freeze([]),
+  cursorWorldPos: null
+});
+
+export const addCalibrationPoint = (point) => (state) => {
+  if (!state.isCalibrating || state.calibrationPoints.length >= 2) return state;
+  return {
+    ...state,
+    calibrationPoints: Object.freeze([...state.calibrationPoints, { x: point.x, y: point.y }])
+  };
+};
+
+export const applyCalibration = (realLength, unit) => (state) => {
+  const [a, b] = state.calibrationPoints;
+  const worldLength = a && b ? distance(a, b) : 0;
+  if (!(worldLength > 0) || !(realLength > 0)) return state;
+  return {
+    ...state,
+    calibration: Object.freeze({
+      realPerWorld: realLength / worldLength,
+      unit: unit === 'm' ? 'm' : 'ft',
+      realLength
+    }),
+    isCalibrating: false,
+    calibrationPoints: Object.freeze([]),
+    cursorWorldPos: null
+  };
 };
 
 export const setDrawingMode = (isDrawing) => (state) => ({
@@ -179,7 +239,7 @@ export const addPolygonVertex = (point) => (state) => {
       past: Object.freeze(nextPast),
       future: Object.freeze([])
     }),
-    metrics: recalculateMetrics(nextPolygon, state.isPolygonClosed, state.rotation)
+    metrics: recalculateMetrics(nextPolygon, state.isPolygonClosed, state.rotation, state.gridAlign)
   };
 };
 
@@ -197,7 +257,7 @@ export const closePolygon = () => (state) => {
       past: Object.freeze(nextPast),
       future: Object.freeze([])
     }),
-    metrics: recalculateMetrics(state.polygon, true, state.rotation)
+    metrics: recalculateMetrics(state.polygon, true, state.rotation, state.gridAlign)
   };
 };
 
@@ -207,7 +267,7 @@ export const updatePolygonVertex = (index, point) => (state) => {
   return {
     ...state,
     polygon: Object.freeze(nextPolygon),
-    metrics: recalculateMetrics(nextPolygon, state.isPolygonClosed, state.rotation)
+    metrics: recalculateMetrics(nextPolygon, state.isPolygonClosed, state.rotation, state.gridAlign)
   };
 };
 
@@ -262,7 +322,7 @@ export const setPolygonPoints = (points, isClosed = true) => (state) => {
       past: Object.freeze(nextPast),
       future: Object.freeze([])
     }),
-    metrics: recalculateMetrics(points, isClosed, state.rotation)
+    metrics: recalculateMetrics(points, isClosed, state.rotation, state.gridAlign)
   };
 };
 
@@ -284,7 +344,7 @@ export const clearBoundary = () => (state) => {
       past: Object.freeze(nextPast),
       future: Object.freeze([])
     }),
-    metrics: recalculateMetrics([], false, state.rotation)
+    metrics: recalculateMetrics([], false, state.rotation, state.gridAlign)
   };
 };
 
@@ -310,7 +370,7 @@ export const undoAction = () => (state) => {
       past: Object.freeze(nextPast),
       future: Object.freeze(nextFuture)
     }),
-    metrics: recalculateMetrics(prevSnapshot.polygon, prevSnapshot.isPolygonClosed, state.rotation)
+    metrics: recalculateMetrics(prevSnapshot.polygon, prevSnapshot.isPolygonClosed, state.rotation, state.gridAlign)
   };
 };
 
@@ -336,7 +396,7 @@ export const redoAction = () => (state) => {
       past: Object.freeze(nextPast),
       future: Object.freeze(nextFuture)
     }),
-    metrics: recalculateMetrics(nextSnapshot.polygon, nextSnapshot.isPolygonClosed, state.rotation)
+    metrics: recalculateMetrics(nextSnapshot.polygon, nextSnapshot.isPolygonClosed, state.rotation, state.gridAlign)
   };
 };
 

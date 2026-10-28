@@ -1,9 +1,16 @@
 /**
- * VastuGrid — 16 Directional Zones & 32 Entrance Padas Computational Engine
+ * Vastu Mandala Studio — 16 Directional Zones & 32 Entrance Padas Computational Engine
  * Classical 16 Directional Zones (22.5° each) & 32 Perimeter Gateway Padas
  */
 
-import { rotatePoint } from './geometry.js';
+import {
+  calculatePolygonArea,
+  calculateSignedArea,
+  clipPolygonByConvex,
+  rayPolygonHit,
+  boundaryPathBetween,
+  distance
+} from './geometry.js';
 
 // Classical 16 Directional Zones Definition
 export const ZONES_16_DATA = [
@@ -97,80 +104,110 @@ export const calculate16DirectionalZones = (centroid, bounds, angleDeg = 0, grid
 };
 
 /**
- * Pure calculation of 32 Perimeter Entrance Gates from the 9x9 grid
- * Divides each of the four perimeter sides into 8 equal segments:
- * - North: N1 to N8
- * - East:  E1 to E8
- * - South: S1 to S8
- * - West:  W1 to W8
- * @param {Object} grid9x9 - The 9x9 grid object
- * @param {Array} devtaFields - The 45 Devtas spatial fields
+ * Attach the real plot area inside each 22.5° zone (polygon clipped to the zone wedge).
+ * Zone areas always sum to the plot area, even when the centroid falls outside the plot.
+ * @param {Object} zones16 - Result of calculate16DirectionalZones
+ * @param {Array} points - Closed plot polygon in world coordinates
  */
-export const calculate32EntranceGates = (grid9x9, devtaFields) => {
-  if (!grid9x9 || !grid9x9.outerBox || grid9x9.outerBox.length < 4) return [];
+export const calculateZoneAreas = (zones16, points) => {
+  if (!zones16 || !points || points.length < 3) return zones16;
 
-  const box = grid9x9.outerBox;
-  const centroid = grid9x9.centroid || { x: (box[0].x + box[2].x) / 2, y: (box[0].y + box[2].y) / 2 };
+  const { centroid } = zones16;
+  const reach = 4 * Math.max(...points.map((p) => distance(p, centroid))) + 1;
+  const totalArea = calculatePolygonArea(points);
 
-  // 4 perimeter sides: [StartCorner, EndCorner, prefix, category, sideName]
-  const sides = [
-    { start: box[0], end: box[1], prefix: 'N', category: 'outer_north', side: 'north' }, // North: NW -> NE
-    { start: box[1], end: box[2], prefix: 'E', category: 'outer_east',  side: 'east'  }, // East:  NE -> SE
-    { start: box[2], end: box[3], prefix: 'S', category: 'outer_south', side: 'south' }, // South: SE -> SW
-    { start: box[3], end: box[0], prefix: 'W', category: 'outer_west',  side: 'west'  }  // West:  SW -> NW
-  ];
+  const zones = zones16.zones.map((zone) => {
+    const wedge = [
+      centroid,
+      { x: centroid.x + Math.cos(zone.startRad) * reach, y: centroid.y + Math.sin(zone.startRad) * reach },
+      { x: centroid.x + Math.cos(zone.endRad) * reach, y: centroid.y + Math.sin(zone.endRad) * reach }
+    ];
+    const area = calculatePolygonArea(clipPolygonByConvex(points, wedge));
+    return {
+      ...zone,
+      area,
+      areaPct: totalArea > 0 ? (area / totalArea) * 100 : 0
+    };
+  });
+
+  return { ...zones16, zones, totalArea };
+};
+
+// The four faces of the 32 entrances, as compass bearings where each face's first gate starts
+const GATE_FACES = [
+  { prefix: 'N', category: 'outer_north', side: 'north', startDeg: 315 }, // N1 at NW → N8 at NE
+  { prefix: 'E', category: 'outer_east',  side: 'east',  startDeg: 45 },  // E1 at NE → E8 at SE
+  { prefix: 'S', category: 'outer_south', side: 'south', startDeg: 135 }, // S1 at SE → S8 at SW
+  { prefix: 'W', category: 'outer_west',  side: 'west',  startDeg: 225 }  // W1 at SW → W8 at NW
+];
+const GATE_SPAN_DEG = 360 / 32; // 11.25°
+
+/**
+ * Pure calculation of the 32 Perimeter Entrance Gates by compass angle.
+ * Each gate is an 11.25° slice seen from the centroid (rotated with North), marked where
+ * the slice actually meets the plot boundary — so labels sit on the real walls.
+ * @param {Array} points - Closed plot polygon in world coordinates
+ * @param {Object} centroid - { x, y }
+ * @param {number} angleDeg - Universal rotation (North) in degrees
+ * @param {Array} devtaFields - The 45 Devtas spatial fields (for gate names)
+ */
+export const calculate32EntranceGates = (points, centroid, angleDeg = 0, devtaFields = null) => {
+  if (!points || points.length < 3 || !centroid) return [];
+
+  const reach = 2 * Math.max(...points.map((p) => distance(p, centroid))) + 1;
+  // Increasing screen angle is clockwise on a y-down canvas, matching a clockwise vertex order
+  const forward = calculateSignedArea(points) > 0;
+
+  const directionAt = (compassDeg) => {
+    const rad = ((-90 + compassDeg + angleDeg) * Math.PI) / 180;
+    return { x: Math.cos(rad), y: Math.sin(rad) };
+  };
+  const hitAt = (compassDeg) => {
+    const dir = directionAt(compassDeg);
+    return rayPolygonHit(points, centroid, dir) || {
+      point: { x: centroid.x + dir.x * reach, y: centroid.y + dir.y * reach },
+      edgeIndex: -1,
+      t: 0,
+      dist: reach
+    };
+  };
 
   const gates = [];
 
-  sides.forEach(({ start, end, prefix, category, side }) => {
-    const dx = end.x - start.x;
-    const dy = end.y - start.y;
-    const len = Math.hypot(dx, dy) || 1;
-
-    // Unit tangent along side
-    const tx = dx / len;
-    const ty = dy / len;
-
-    // Outward unit normal pointing away from centroid
-    let nx = -ty;
-    let ny = tx;
-    const midX = (start.x + end.x) / 2;
-    const midY = (start.y + end.y) / 2;
-    if (nx * (midX - centroid.x) + ny * (midY - centroid.y) < 0) {
-      nx = -nx;
-      ny = -ny;
-    }
-    const normal = { x: nx, y: ny };
-
-    // 8 equal segments per side
+  GATE_FACES.forEach(({ prefix, category, side, startDeg }) => {
     for (let i = 0; i < 8; i++) {
       const code = `${prefix}${i + 1}`;
-      const t0 = i / 8;
-      const t1 = (i + 1) / 8;
-      const tMid = (i + 0.5) / 8;
+      const fromDeg = startDeg + i * GATE_SPAN_DEG;
+      const toDeg = fromDeg + GATE_SPAN_DEG;
 
-      const segStart = { x: start.x + dx * t0, y: start.y + dy * t0 };
-      const segEnd = { x: start.x + dx * t1, y: start.y + dy * t1 };
-      const edgeMidpoint = { x: start.x + dx * tMid, y: start.y + dy * tMid };
+      const hitStart = hitAt(fromDeg);
+      const hitEnd = hitAt(toDeg);
+      const hitMid = hitAt(fromDeg + GATE_SPAN_DEG / 2);
+      const path = (hitStart.edgeIndex >= 0 && hitEnd.edgeIndex >= 0)
+        ? boundaryPathBetween(points, hitStart, hitEnd, forward)
+        : [hitStart.point, hitEnd.point];
 
       const devta = devtaFields ? devtaFields.find((d) => d.entranceCode === code) : null;
-      const isAuspicious = AUSPICIOUS_ENTRANCES.has(code);
 
       gates.push({
         id: devta ? devta.id : code.toLowerCase(),
         name: devta ? devta.name : code,
         code,
         number: devta ? devta.number : i + 1,
-        isAuspicious,
+        isAuspicious: AUSPICIOUS_ENTRANCES.has(code),
         category,
         side,
         segmentIndex: i,
-        center: devta ? devta.center : edgeMidpoint,
-        boundaryCorners: devta ? devta.boundaryCorners : null,
-        outerEdgeStart: segStart,
-        outerEdgeEnd: segEnd,
-        edgeMidpoint,
-        normal,
+        fromDeg: fromDeg % 360,
+        toDeg: toDeg % 360,
+        center: hitMid.point,
+        path,
+        outerEdgeStart: hitStart.point,
+        outerEdgeEnd: hitEnd.point,
+        startNormal: directionAt(fromDeg),
+        endNormal: directionAt(toDeg),
+        edgeMidpoint: hitMid.point,
+        normal: directionAt(fromDeg + GATE_SPAN_DEG / 2),
         attribute: devta ? devta.description : ''
       });
     }

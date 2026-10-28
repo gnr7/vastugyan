@@ -1,9 +1,16 @@
 /**
- * VastuGrid — Client-Side Export Engine (PNG & Professional PDF Report)
+ * Vastu Mandala Studio — Client-Side Export Engine (PNG & Professional PDF Report)
  * Generates high-resolution PNG captures and multi-page client-ready PDF reports.
  */
 
-import { calculateAreaMetrics, calculatePanchTatvaSummary, calculateGateAssessment, calculatePositiveLandEnergy } from './analysis.js';
+import {
+  calculateAreaMetrics,
+  calculatePanchTatvaSummary,
+  calculateGateAssessment,
+  calculatePositiveLandEnergy,
+  formatArea,
+  formatLength
+} from './analysis.js';
 
 /**
  * Export canvas view directly to high-resolution PNG file
@@ -17,7 +24,7 @@ export const exportCanvasToPng = (canvas, filename = '') => {
   }
 
   const dateStr = new Date().toISOString().slice(0, 10);
-  const name = filename || `VastuGrid-Plan-${dateStr}.png`;
+  const name = filename || `VastuMandala-Plan-${dateStr}.png`;
 
   const dataUrl = canvas.toDataURL('image/png', 1.0);
   const link = document.createElement('a');
@@ -49,7 +56,7 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
   });
 
   const dateStr = new Date().toISOString().slice(0, 10);
-  const reportName = filename || `VastuGrid-Report-${dateStr}.pdf`;
+  const reportName = filename || `VastuMandala-Report-${dateStr}.pdf`;
 
   // Client personal details (optional)
   const clientName = (clientInfo.name || '').trim();
@@ -59,9 +66,11 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
 
   // Calculate metrics and analysis
   const areaData = calculateAreaMetrics(state.metrics);
-  const tatvaData = calculatePanchTatvaSummary();
+  const cal = state.calibration;
+  const grid = state.metrics.grid9x9;
+  const tatvaData = calculatePanchTatvaSummary(state.metrics.zones16);
   const gateData = calculateGateAssessment(state.metrics.entranceGates32);
-  const landData = calculatePositiveLandEnergy(state.metrics);
+  const landData = calculatePositiveLandEnergy(state.metrics, cal);
 
   // Palette constants
   const primaryBlue = [26, 115, 232];
@@ -79,7 +88,7 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
   doc.setTextColor(255, 255, 255);
-  doc.text('VASTUGRID — PROFESSIONAL VASTU PURUSHA MANDALA REPORT', 14, 12);
+  doc.text('VASTU MANDALA STUDIO — VASTU PURUSHA MANDALA REPORT', 14, 12);
 
   // Subheader info (with optional Client Info)
   doc.setFont('helvetica', 'normal');
@@ -136,18 +145,20 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
   doc.setTextColor(...darkCharcoal);
 
   // Column 1
-  doc.text(`Total Plot Area: ${Math.round(areaData.plotArea).toLocaleString()} sq units`, 20, yPos + 16);
-  doc.text(`Brahmasthan (3×3 Core): ${Math.round(areaData.brahmasthanArea).toLocaleString()} sq units (${areaData.brahmasthanRatioPct}%)`, 20, yPos + 23);
-  doc.text(`Bounding Dimensions: ${Math.round(areaData.width)} × ${Math.round(areaData.height)} units`, 20, yPos + 30);
+  doc.text(`Total Plot Area: ${formatArea(areaData.plotArea, cal)}`, 20, yPos + 16);
+  doc.text(`Brahmasthan (3×3 Core): ${formatArea(areaData.brahmasthanArea, cal)} (${areaData.brahmasthanRatioPct}%)`, 20, yPos + 23);
+  doc.text(grid
+    ? `Grid Dimensions: ${formatLength(grid.totalWidth, cal)} × ${formatLength(grid.totalHeight, cal)}`
+    : 'Grid Dimensions: —', 20, yPos + 30);
 
   // Column 2
-  doc.text(`Single Pada Area (1/81): ${Math.round(areaData.padaArea).toLocaleString()} sq units`, 110, yPos + 16);
-  doc.text(`Universal Rotation: ${state.rotation}° (North Calibrated)`, 110, yPos + 23);
+  doc.text(`Single Pada Area (1/81): ${formatArea(areaData.padaArea, cal)}`, 110, yPos + 16);
+  doc.text(`Universal Rotation: ${state.rotation}° · Grid ${state.gridAlign === 'walls' ? 'on plot walls' : 'turned with North'}`, 110, yPos + 23);
   doc.text(`Boundary Vertices: ${state.polygon.length} points (${state.isPolygonClosed ? 'Closed Polygon' : 'Draft'})`, 110, yPos + 30);
 
   // Executive Vastu Insights Box
   yPos = 194;
-  const boxHeight = landData.isActive ? 38 : 32;
+  const boxHeight = (landData.isActive || !cal) ? 38 : 32;
   doc.setFillColor(230, 244, 234); // soft green
   doc.rect(14, yPos, 182, boxHeight, 'F');
   doc.setDrawColor(...successGreen);
@@ -166,7 +177,9 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
   doc.text('• 8 Classical Auspicious Gateways identified: N3/N4 (North), E3/E4 (East), S3/S4 (South), and W3/W4 (West).', 20, yPos + 20);
   doc.text('• 16 Directional Zones radiate at 22.5° intervals from the geometric center of mass (centroid).', 20, yPos + 26);
   if (landData.isActive) {
-    doc.text(`• Positive Land Energy: ${landData.verdict.title} (Income: ${landData.income} vs Expenditure: ${landData.expenditure} | Remainder: ${landData.remainder} | Ratio: ${landData.ratio})`, 20, yPos + 32);
+    doc.text(`• Positive Land Energy (${landData.length} × ${landData.breadth} ft): ${landData.verdict.title} (Income ${landData.income} vs Expenditure ${landData.expenditure} | Remainder ${landData.remainder} | Ratio ${landData.ratio})`, 20, yPos + 32);
+  } else if (!cal) {
+    doc.text('• Real dimensions not set (Set Scale): areas are in canvas pixels and Land Energy was not evaluated.', 20, yPos + 32);
   }
 
   // Page 1 Footer
@@ -176,7 +189,7 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
     const clientSummary = [clientName, clientPhone].filter(Boolean).join(' · ');
     doc.text(`Page 1 of 2 — Prepared for: ${clientSummary}`, 14, 287);
   } else {
-    doc.text('Page 1 of 2 — VastuGrid Client Report', 14, 287);
+    doc.text('Page 1 of 2 — Vastu Mandala Studio Report', 14, 287);
   }
   doc.text('Open Source · Local-First Vastu Analysis Tool', 135, 287);
 
@@ -208,7 +221,7 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(...mediumGray);
-  doc.text('Energy balance across the 16 directional zones in the property:', 14, yPos);
+  doc.text('Share of the plot area falling in each element\'s directional zones:', 14, yPos);
 
   yPos += 5;
   // Table Header
@@ -222,7 +235,7 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
   doc.setTextColor(...darkCharcoal);
   doc.text('Element', 18, yPos + 5.5);
   doc.text('Directional Zones', 60, yPos + 5.5);
-  doc.text('Share (%)', 120, yPos + 5.5);
+  doc.text('Area Share', 120, yPos + 5.5);
   doc.text('Core Vastu Attribute', 145, yPos + 5.5);
 
   // Table Rows
@@ -317,7 +330,7 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
     const clientSummary = [clientName, clientPhone].filter(Boolean).join(' · ');
     doc.text(`Page 2 of 2 — Prepared for: ${clientSummary}`, 14, 287);
   } else {
-    doc.text('Page 2 of 2 — VastuGrid Client Report', 14, 287);
+    doc.text('Page 2 of 2 — Vastu Mandala Studio Report', 14, 287);
   }
   doc.text('Open Source · Local-First Vastu Analysis Tool', 135, 287);
 

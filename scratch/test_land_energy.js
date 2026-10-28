@@ -3,6 +3,9 @@
  */
 import { calculatePositiveLandEnergy, ENERGY_PATTERNS_DICT } from '../js/analysis.js';
 
+// Set Scale result: 10 canvas px = 1 ft
+const FT_SCALE = { realPerWorld: 0.1, unit: 'ft' };
+
 console.log('--- Testing Positive Land Energy Analysis ---');
 
 // Test Case 1: Square Plot (40 x 40)
@@ -11,12 +14,12 @@ const squareMetrics = {
   bounds: { width: 400, height: 400 },
   grid9x9: { totalWidth: 400, totalHeight: 400 }
 };
-const resSquare = calculatePositiveLandEnergy(squareMetrics);
+const resSquare = calculatePositiveLandEnergy(squareMetrics, FT_SCALE);
 console.log('\n1. Square Plot (40 x 40):');
 console.log('Length:', resSquare.length, 'Breadth:', resSquare.breadth);
 console.log('Income:', resSquare.income, 'Expenditure:', resSquare.expenditure);
 console.log('Income > Expenditure:', resSquare.incomeGreater);
-console.log('Remainder:', resSquare.remainder, 'Pattern:', resSquare.remainderInfo.yoni, '-', resSquare.remainderInfo.quality);
+console.log('Remainder:', resSquare.remainder, 'Pattern:', resSquare.remainderInfo.quality);
 console.log('Ratio:', resSquare.ratio, 'Ratio <= 2.5:', resSquare.ratioGood);
 console.log('Verdict:', resSquare.verdict.title);
 
@@ -31,12 +34,12 @@ const rectMetrics = {
   bounds: { width: 600, height: 400 },
   grid9x9: { totalWidth: 600, totalHeight: 400 }
 };
-const resRect = calculatePositiveLandEnergy(rectMetrics);
+const resRect = calculatePositiveLandEnergy(rectMetrics, FT_SCALE);
 console.log('\n2. Standard Rectangular Plot (60 x 40):');
 console.log('Length:', resRect.length, 'Breadth:', resRect.breadth);
 console.log('Income:', resRect.income, 'Expenditure:', resRect.expenditure);
 console.log('Income > Expenditure:', resRect.incomeGreater);
-console.log('Remainder:', resRect.remainder, 'Pattern:', resRect.remainderInfo.yoni, '-', resRect.remainderInfo.quality);
+console.log('Remainder:', resRect.remainder, 'Pattern:', resRect.remainderInfo.quality);
 console.log('Ratio:', resRect.ratio, 'Ratio <= 2.5:', resRect.ratioGood);
 console.log('Verdict:', resRect.verdict.title);
 
@@ -49,7 +52,7 @@ const longMetrics = {
   bounds: { width: 900, height: 300 },
   grid9x9: { totalWidth: 900, totalHeight: 300 }
 };
-const resLong = calculatePositiveLandEnergy(longMetrics);
+const resLong = calculatePositiveLandEnergy(longMetrics, FT_SCALE);
 console.log('\n3. Elongated Plot (90 x 30):');
 console.log('Length:', resLong.length, 'Breadth:', resLong.breadth);
 console.log('Ratio:', resLong.ratio, 'Ratio <= 2.5:', resLong.ratioGood);
