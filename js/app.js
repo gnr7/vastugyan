@@ -16,7 +16,8 @@ import {
   redoAction,
   setGridAlign,
   setCalibrationMode,
-  applyCalibration
+  applyCalibration,
+  restoreProject
 } from './state.js';
 import { CanvasController, computeFitViewport, refreshTheme } from './canvas.js';
 import { initUI } from './ui.js';
@@ -29,7 +30,8 @@ import {
   formatLength
 } from './analysis.js';
 import { draw16BarChart } from './barchart.js';
-import { exportCanvasToPng, generatePdfReport } from './export.js';
+import { exportCanvasToPng, generatePdfReport, deliverFile } from './export.js';
+import { loadProject, clearProject, startAutosave } from './persist.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   // 1. Initialize store and canvas controller
@@ -49,6 +51,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let lastState = store.getState();
   // The start screen shows until the person picks a plan, a blank canvas, or starts drawing
   let workspaceStarted = false;
+  let currentImageBlob = null; // original floor plan file, kept for autosave
+  let restoring = false;        // silence step-by-step toasts while a saved project loads
 
   // Re-read canvas colours when the system switches between light and dark
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
@@ -146,6 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const img = new Image();
       img.onload = () => {
         workspaceStarted = true;
+        currentImageBlob = file;
         store.setState(setFloorPlanImage(img, { name: file.name, size: file.size }));
         canvasController.fitToView();
         ui.showToast('Floor plan added — tap Draw to trace the boundary');
@@ -298,10 +303,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnBarChartPng) {
     btnBarChartPng.addEventListener('click', () => {
       const dateStr = new Date().toISOString().slice(0, 10);
-      const link = document.createElement('a');
-      link.download = `VastuMandala-16-Bar-Chart-${dateStr}.png`;
-      link.href = barChartCanvas.toDataURL('image/png');
-      link.click();
+      barChartCanvas.toBlob((blob) => {
+        deliverFile(blob, `VastuMandala-16-Bar-Chart-${dateStr}.png`).then(announceExport);
+      }, 'image/png');
     });
   }
 
@@ -356,6 +360,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnResetAll) {
     btnResetAll.addEventListener('click', () => {
       workspaceStarted = false;
+      currentImageBlob = null;
+      clearProject();
       store.setState(resetAll());
       setTimeout(() => canvasController.fitToView(), 50);
     });
@@ -385,10 +391,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // 9. Export Actions
+  // 9. Export Actions (share sheet on phones, download elsewhere)
+  const announceExport = (outcome) => {
+    if (outcome === 'downloaded') ui.showToast('Saved to your downloads');
+  };
   if (btnExportPng) {
     btnExportPng.addEventListener('click', () => {
-      exportCanvasToPng(canvasElement);
+      exportCanvasToPng(canvasElement).then(announceExport);
     });
   }
 
@@ -431,7 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnPdfModalSkip) {
     btnPdfModalSkip.addEventListener('click', async () => {
       closePdfModal();
-      await generatePdfReport(canvasElement, store.getState(), '', {});
+      announceExport(await generatePdfReport(canvasElement, store.getState(), '', {}));
     });
   }
 
@@ -443,7 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
         address: pdfAddress ? pdfAddress.value.trim() : ''
       };
       closePdfModal();
-      await generatePdfReport(canvasElement, store.getState(), '', clientInfo);
+      announceExport(await generatePdfReport(canvasElement, store.getState(), '', clientInfo));
     });
   }
 
@@ -462,10 +471,10 @@ document.addEventListener('DOMContentLoaded', () => {
     ui.sync(state);
 
     // Moments worth confirming
-    if (state.isPolygonClosed && !lastState.isPolygonClosed && state.polygon.length >= 3) {
+    if (!restoring && state.isPolygonClosed && !lastState.isPolygonClosed && state.polygon.length >= 3) {
       ui.showToast(state.calibration ? 'Boundary closed — open Analysis for the reading' : 'Boundary closed — set the scale for real dimensions');
     }
-    if (state.calibration && state.calibration !== lastState.calibration) {
+    if (!restoring && state.calibration && state.calibration !== lastState.calibration) {
       ui.showToast(`Scale set: ${state.calibration.realLength} ${state.calibration.unit} reference`);
     }
     lastState = state;
@@ -727,6 +736,62 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Initial fit to view
-  setTimeout(() => canvasController.fitToView(), 100);
+  // Restore the last project saved on this device, then keep saving changes
+  const loadImageBlob = (blob, name) => new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      store.setState(setFloorPlanImage(img, { name: name || 'Floor plan', size: blob.size }));
+      resolve(true);
+    };
+    img.onerror = () => resolve(false);
+    img.src = URL.createObjectURL(blob);
+  });
+
+  loadProject().then(async (saved) => {
+    const hasSaved = saved && ((saved.polygon && saved.polygon.length) || saved.imageBlob || saved.calibration);
+    if (hasSaved) {
+      workspaceStarted = true;
+      restoring = true;
+      if (saved.imageBlob) {
+        currentImageBlob = saved.imageBlob;
+        await loadImageBlob(saved.imageBlob, saved.imageName);
+      }
+      store.setState(restoreProject(saved));
+      restoring = false;
+      ui.showToast('Your last project is back');
+    }
+    setTimeout(() => canvasController.fitToView(), 60);
+    startAutosave(store, () => currentImageBlob);
+  });
+
+  // Offline support and installation (only over http/https, not file://)
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    navigator.serviceWorker.register('sw.js').catch((err) => console.warn('Offline support unavailable:', err));
+  }
+
+  const btnInstall = document.getElementById('btnInstall');
+  const iosInstallHint = document.getElementById('iosInstallHint');
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  let installPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    installPrompt = e;
+    if (btnInstall) btnInstall.hidden = false;
+  });
+  if (btnInstall) {
+    btnInstall.addEventListener('click', async () => {
+      if (!installPrompt) return;
+      installPrompt.prompt();
+      const choice = await installPrompt.userChoice;
+      installPrompt = null;
+      btnInstall.hidden = true;
+      if (choice.outcome === 'accepted') ui.showToast('Installed — open it from your home screen');
+    });
+  }
+  window.addEventListener('appinstalled', () => {
+    if (btnInstall) btnInstall.hidden = true;
+  });
+  // iPhone and iPad have no install prompt; show how to add it from Safari
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (iosInstallHint && isIOS && !isStandalone) iosInstallHint.hidden = false;
 });

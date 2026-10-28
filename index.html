@@ -14,6 +14,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Marcellus&display=swap" rel="stylesheet">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -396,6 +399,14 @@
               <span class="action-icon"><svg class="icon"><use href="#i-upload"/></svg></span>
               <span class="action-text"><span class="action-title">Choose image</span><span class="action-sub">PNG, JPG or WebP from your device</span></span>
             </button>
+            <h2 class="section-heading">App</h2>
+            <button id="btnInstall" class="action-row" hidden>
+              <span class="action-icon"><svg class="icon"><use href="#i-upload"/></svg></span>
+              <span class="action-text"><span class="action-title">Install app</span><span class="action-sub">Add Vastu Mandala to your home screen; works offline</span></span>
+            </button>
+            <p class="scale-status" id="iosInstallHint" hidden>To install on iPhone or iPad: tap Share in Safari, then Add to Home Screen.</p>
+            <p class="scale-status">Works offline once opened. Your project is saved on this device automatically.</p>
+
             <h2 class="section-heading">Project</h2>
             <button id="btnClearBoundary" class="action-row">
               <span class="action-icon"><svg class="icon"><use href="#i-trash"/></svg></span>
@@ -405,7 +416,6 @@
               <span class="action-icon"><svg class="icon"><use href="#i-reset"/></svg></span>
               <span class="action-text"><span class="action-title">Start over</span><span class="action-sub">Removes the plan, boundary, scale and saved project</span></span>
             </button>
-            <p class="scale-status">Your project is saved on this device automatically.</p>
           </section>
         </div>
       </aside>

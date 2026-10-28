@@ -1,0 +1,19 @@
+{
+  "name": "Vastu Mandala Studio",
+  "short_name": "Vastu Mandala",
+  "description": "Trace your floor plan and read it through the Vastu Purusha Mandala: 9×9 grid, 45 Devtas, 16 zones, 32 entrances and land energy.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F7F1E6",
+  "theme_color": "#F7F1E6",
+  "categories": ["lifestyle", "productivity", "utilities"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

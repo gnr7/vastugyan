@@ -15,26 +15,45 @@ import {
 import { barChartToDataUrl } from './barchart.js';
 
 /**
- * Export canvas view directly to high-resolution PNG file
- * @param {HTMLCanvasElement} canvas
- * @param {string} filename
+ * Hand a finished file to the person: the phone's share sheet on touch devices
+ * (WhatsApp, Drive, Files…), a normal download elsewhere or if sharing isn't available.
+ * @returns {Promise<'shared'|'downloaded'|'cancelled'>}
  */
-export const exportCanvasToPng = (canvas, filename = '') => {
-  if (!canvas) {
-    alert('Canvas element not found.');
-    return;
+export const deliverFile = async (blob, filename) => {
+  const file = new File([blob], filename, { type: blob.type });
+  const prefersShare = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  if (prefersShare && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: filename });
+      return 'shared';
+    } catch (err) {
+      if (err && err.name === 'AbortError') return 'cancelled';
+      // Fall through to a download if the share sheet failed for any other reason
+    }
   }
-
-  const dateStr = new Date().toISOString().slice(0, 10);
-  const name = filename || `VastuMandala-Plan-${dateStr}.png`;
-
-  const dataUrl = canvas.toDataURL('image/png', 1.0);
+  const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.download = name;
-  link.href = dataUrl;
+  link.download = filename;
+  link.href = url;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  return 'downloaded';
+};
+
+const canvasToBlob = (canvas) => new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+
+/**
+ * Export the canvas view (with the visible overlays) as a PNG
+ * @param {HTMLCanvasElement} canvas
+ * @param {string} filename
+ */
+export const exportCanvasToPng = async (canvas, filename = '') => {
+  if (!canvas) return 'cancelled';
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const name = filename || `VastuMandala-Plan-${dateStr}.png`;
+  return deliverFile(await canvasToBlob(canvas), name);
 };
 
 /**
@@ -46,8 +65,7 @@ export const exportCanvasToPng = (canvas, filename = '') => {
  */
 export const generatePdfReport = async (canvas, state, filename = '', clientInfo = {}) => {
   if (!window.jspdf) {
-    alert('PDF export library is still loading. Please try again in a moment.');
-    return;
+    return 'cancelled';
   }
 
   const { jsPDF } = window.jspdf;
@@ -436,5 +454,5 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
   }
 
   // Save PDF file
-  doc.save(reportName);
+  return deliverFile(doc.output('blob'), reportName);
 };

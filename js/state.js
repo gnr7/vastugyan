@@ -401,6 +401,29 @@ export const redoAction = () => (state) => {
 };
 
 export const resetAll = () => () => createInitialState();
+
+// Bring back a project saved on this device (the floor plan image is restored separately)
+export const restoreProject = (saved) => (state) => {
+  if (!saved) return state;
+  const polygon = Object.freeze((saved.polygon || []).map((p) => ({ x: p.x, y: p.y })));
+  const isPolygonClosed = !!saved.isPolygonClosed && polygon.length >= 3;
+  const rotation = ((Number(saved.rotation) || 0) % 360 + 360) % 360;
+  const gridAlign = saved.gridAlign === 'walls' ? 'walls' : 'north';
+  const calibration = saved.calibration && saved.calibration.realPerWorld > 0
+    ? Object.freeze({ ...saved.calibration })
+    : null;
+  const layers = Object.freeze({ ...state.layers, ...(saved.layers || {}) });
+  return {
+    ...state,
+    polygon,
+    isPolygonClosed,
+    rotation,
+    gridAlign,
+    calibration,
+    layers,
+    metrics: recalculateMetrics(polygon, isPolygonClosed, rotation, gridAlign)
+  };
+};
 export const clearPolygon = clearBoundary;
 export const clearAll = resetAll;
 
