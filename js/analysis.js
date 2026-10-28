@@ -142,6 +142,57 @@ export const calculatePanchTatvaSummary = (zones16 = null) => {
   });
 };
 
+// Bar colour groups for the 16 Bar Chart, relative to the average and ±1 standard deviation
+export const BAR_BANDS = {
+  high: { label: 'Strong (above avg + 1 SD)', color: '#1e8e3e' },
+  above: { label: 'Above average', color: '#1a73e8' },
+  below: { label: 'Below average', color: '#8ab4f8' },
+  low: { label: 'Weak (below avg − 1 SD)', color: '#d93025' }
+};
+
+/**
+ * Pure calculation of the 16 Bar Chart: each direction's share of the plot area.
+ * The average is always 100 / 16 = 6.25%; the spread (population SD over the 16 shares)
+ * is what changes with the plot's shape.
+ * @param {Object} zones16 - Zones with per-zone `area` from calculateZoneAreas
+ */
+export const calculate16BarChart = (zones16 = null) => {
+  const zones = zones16 && zones16.zones ? zones16.zones : [];
+  const totalArea = zones.reduce((sum, z) => sum + (typeof z.area === 'number' ? z.area : 0), 0);
+  if (zones.length !== 16 || !(totalArea > 0)) {
+    return { hasData: false, bars: [], totalArea: 0, mean: 0, sd: 0, max: null, min: null };
+  }
+
+  const pcts = zones.map((z) => (z.area / totalArea) * 100);
+  const mean = pcts.reduce((sum, p) => sum + p, 0) / pcts.length;
+  const sd = Math.sqrt(pcts.reduce((sum, p) => sum + (p - mean) ** 2, 0) / pcts.length);
+  const eps = 1e-9;
+
+  const bars = zones.map((z, i) => {
+    const pct = pcts[i];
+    let band;
+    if (pct > mean + sd + eps) band = 'high';
+    else if (pct < mean - sd - eps) band = 'low';
+    else band = pct >= mean ? 'above' : 'below';
+    return { id: z.id, name: z.name, element: z.element, area: z.area, pct, band, color: BAR_BANDS[band].color };
+  });
+
+  const max = bars.reduce((best, b) => (b.pct > best.pct ? b : best), bars[0]);
+  const min = bars.reduce((best, b) => (b.pct < best.pct ? b : best), bars[0]);
+
+  return {
+    hasData: true,
+    bars,
+    totalArea,
+    mean,
+    sd,
+    max,
+    min,
+    strong: bars.filter((b) => b.band === 'high').map((b) => b.id),
+    weak: bars.filter((b) => b.band === 'low').map((b) => b.id)
+  };
+};
+
 /**
  * Pure calculation of 32 Entrance Gate Assessment summary
  */

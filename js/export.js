@@ -8,9 +8,11 @@ import {
   calculatePanchTatvaSummary,
   calculateGateAssessment,
   calculatePositiveLandEnergy,
+  calculate16BarChart,
   formatArea,
   formatLength
 } from './analysis.js';
+import { barChartToDataUrl } from './barchart.js';
 
 /**
  * Export canvas view directly to high-resolution PNG file
@@ -71,6 +73,8 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
   const tatvaData = calculatePanchTatvaSummary(state.metrics.zones16);
   const gateData = calculateGateAssessment(state.metrics.entranceGates32);
   const landData = calculatePositiveLandEnergy(state.metrics, cal);
+  const barChart = calculate16BarChart(state.metrics.zones16);
+  const totalPages = barChart.hasData ? 3 : 2;
 
   // Palette constants
   const primaryBlue = [26, 115, 232];
@@ -187,9 +191,9 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
   doc.setTextColor(...mediumGray);
   if (hasClient) {
     const clientSummary = [clientName, clientPhone].filter(Boolean).join(' · ');
-    doc.text(`Page 1 of 2 — Prepared for: ${clientSummary}`, 14, 287);
+    doc.text(`Page 1 of ${totalPages} — Prepared for: ${clientSummary}`, 14, 287);
   } else {
-    doc.text('Page 1 of 2 — Vastu Mandala Studio Report', 14, 287);
+    doc.text(`Page 1 of ${totalPages} — Vastu Mandala Studio Report`, 14, 287);
   }
   doc.text('Open Source · Local-First Vastu Analysis Tool', 135, 287);
 
@@ -328,11 +332,108 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
   doc.setTextColor(...mediumGray);
   if (hasClient) {
     const clientSummary = [clientName, clientPhone].filter(Boolean).join(' · ');
-    doc.text(`Page 2 of 2 — Prepared for: ${clientSummary}`, 14, 287);
+    doc.text(`Page 2 of ${totalPages} — Prepared for: ${clientSummary}`, 14, 287);
   } else {
-    doc.text('Page 2 of 2 — Vastu Mandala Studio Report', 14, 287);
+    doc.text(`Page 2 of ${totalPages} — Vastu Mandala Studio Report`, 14, 287);
   }
   doc.text('Open Source · Local-First Vastu Analysis Tool', 135, 287);
+
+  // ==================== PAGE 3: 16 Direction Bar Chart ====================
+  if (barChart.hasData) {
+    doc.addPage();
+
+    doc.setFillColor(...primaryBlue);
+    doc.rect(0, 0, 210, 14, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(255, 255, 255);
+    doc.text('16 DIRECTION BAR CHART — AREA DISTRIBUTION BY DIRECTION', 14, 9.5);
+    if (hasClient && clientName) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text(`Client: ${clientName}`, 196, 9.5, { align: 'right' });
+    }
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...mediumGray);
+    doc.text('Share of the plot area falling in each of the 16 compass zones (22.5° each, measured from the centroid):', 14, 22);
+
+    // Chart image (720 × 400 aspect)
+    const chartW = 170;
+    const chartH = (chartW * 400) / 720;
+    doc.setDrawColor(218, 220, 224);
+    doc.rect(19.5, 25.5, chartW + 1, chartH + 1, 'S');
+    doc.addImage(barChartToDataUrl(barChart), 'PNG', 20, 26, chartW, chartH);
+
+    // Summary card
+    yPos = 26 + chartH + 8;
+    doc.setFillColor(...lightBg);
+    doc.rect(14, yPos, 182, 30, 'F');
+    doc.setDrawColor(218, 220, 224);
+    doc.rect(14, yPos, 182, 30, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10.5);
+    doc.setTextColor(...darkCharcoal);
+    doc.text('DIRECTIONAL BALANCE SUMMARY', 20, yPos + 7);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(`Total Plot Area: ${formatArea(barChart.totalArea, cal)}`, 20, yPos + 15);
+    doc.text(`Average Share: ${barChart.mean.toFixed(2)}% ± ${barChart.sd.toFixed(2)}% (1 SD)`, 20, yPos + 22);
+    doc.text(`Max Direction: ${barChart.max.id} (${barChart.max.pct.toFixed(1)}%)`, 110, yPos + 15);
+    doc.text(`Min Direction: ${barChart.min.id} (${barChart.min.pct.toFixed(1)}%)`, 110, yPos + 22);
+
+    // Strong / weak directions
+    yPos += 38;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...successGreen);
+    doc.text(`Strong directions (above average + 1 SD): ${barChart.strong.length ? barChart.strong.join(', ') : 'none'}`, 14, yPos);
+    doc.setTextColor(217, 48, 37);
+    doc.text(`Weak directions (below average − 1 SD): ${barChart.weak.length ? barChart.weak.join(', ') : 'none'}`, 14, yPos + 7);
+
+    // Per-direction table
+    yPos += 15;
+    doc.setFillColor(...lightBg);
+    doc.rect(14, yPos, 182, 7, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...darkCharcoal);
+    doc.text('Direction', 18, yPos + 5);
+    doc.text('Area', 60, yPos + 5);
+    doc.text('Share', 110, yPos + 5);
+    doc.text('Element', 140, yPos + 5);
+    doc.text('Status', 168, yPos + 5);
+    yPos += 7;
+
+    doc.setFont('helvetica', 'normal');
+    barChart.bars.forEach((bar) => {
+      const bandText = bar.band === 'high' ? 'Strong' : bar.band === 'low' ? 'Weak' : 'Normal';
+      doc.setTextColor(...darkCharcoal);
+      doc.text(bar.id, 18, yPos + 4);
+      doc.text(formatArea(bar.area, cal), 60, yPos + 4);
+      doc.text(`${bar.pct.toFixed(1)}%`, 110, yPos + 4);
+      doc.text(bar.element, 140, yPos + 4);
+      if (bar.band === 'high') doc.setTextColor(...successGreen);
+      else if (bar.band === 'low') doc.setTextColor(217, 48, 37);
+      doc.text(bandText, 168, yPos + 4);
+      doc.setDrawColor(241, 243, 244);
+      doc.line(14, yPos + 5.4, 196, yPos + 5.4);
+      yPos += 5.4;
+    });
+
+    doc.setFontSize(8);
+    doc.setTextColor(...mediumGray);
+    if (hasClient) {
+      const clientSummary = [clientName, clientPhone].filter(Boolean).join(' · ');
+      doc.text(`Page 3 of 3 — Prepared for: ${clientSummary}`, 14, 287);
+    } else {
+      doc.text('Page 3 of 3 — Vastu Mandala Studio Report', 14, 287);
+    }
+    doc.text('Open Source · Local-First Vastu Analysis Tool', 135, 287);
+  }
 
   // Save PDF file
   doc.save(reportName);

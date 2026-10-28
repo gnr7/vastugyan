@@ -23,9 +23,11 @@ import {
   calculateAreaMetrics,
   calculatePositiveLandEnergy,
   calculatePanchTatvaSummary,
+  calculate16BarChart,
   formatArea,
   formatLength
 } from './analysis.js';
+import { draw16BarChart } from './barchart.js';
 import { exportCanvasToPng, generatePdfReport } from './export.js';
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -70,6 +72,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnScaleModalApply = document.getElementById('btnScaleModalApply');
   const btnScaleModalCancel = document.getElementById('btnScaleModalCancel');
   const btnScaleModalClose = document.getElementById('btnScaleModalClose');
+
+  // 16 Bar Chart controls
+  const btnOpenBarChart = document.getElementById('btnOpenBarChart');
+  const barChartBackdrop = document.getElementById('barChartBackdrop');
+  const barChartCanvas = document.getElementById('barChartCanvas');
+  const btnBarChartClose = document.getElementById('btnBarChartClose');
+  const btnBarChartDone = document.getElementById('btnBarChartDone');
+  const btnBarChartPng = document.getElementById('btnBarChartPng');
 
   // Layer switches
   const toggles = {
@@ -228,6 +238,46 @@ document.addEventListener('DOMContentLoaded', () => {
     scaleLength.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') submitScale();
       if (e.key === 'Escape') cancelScale();
+    });
+  }
+
+  // 5c. 16 Bar Chart popup (redrawn live from the store while open)
+  const isBarChartOpen = () => barChartBackdrop && barChartBackdrop.style.display === 'flex';
+  const renderBarChart = (state) => {
+    const chart = calculate16BarChart(state.metrics.zones16);
+    draw16BarChart(barChartCanvas, chart);
+    const cal = state.calibration;
+    document.getElementById('barStatTotal').textContent = chart.hasData ? formatArea(chart.totalArea, cal) : '—';
+    document.getElementById('barStatMean').textContent = chart.hasData
+      ? `${chart.mean.toFixed(2)}% ± ${chart.sd.toFixed(2)}%`
+      : '—';
+    document.getElementById('barStatMax').textContent = chart.hasData ? `${chart.max.id} (${chart.max.pct.toFixed(1)}%)` : '—';
+    document.getElementById('barStatMin').textContent = chart.hasData ? `${chart.min.id} (${chart.min.pct.toFixed(1)}%)` : '—';
+  };
+  const closeBarChart = () => {
+    if (barChartBackdrop) barChartBackdrop.style.display = 'none';
+  };
+
+  if (btnOpenBarChart) {
+    btnOpenBarChart.addEventListener('click', () => {
+      barChartBackdrop.style.display = 'flex';
+      renderBarChart(store.getState());
+    });
+  }
+  if (btnBarChartClose) btnBarChartClose.addEventListener('click', closeBarChart);
+  if (btnBarChartDone) btnBarChartDone.addEventListener('click', closeBarChart);
+  if (barChartBackdrop) {
+    barChartBackdrop.addEventListener('click', (e) => {
+      if (e.target === barChartBackdrop) closeBarChart();
+    });
+  }
+  if (btnBarChartPng) {
+    btnBarChartPng.addEventListener('click', () => {
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const link = document.createElement('a');
+      link.download = `VastuMandala-16-Bar-Chart-${dateStr}.png`;
+      link.href = barChartCanvas.toDataURL('image/png');
+      link.click();
     });
   }
 
@@ -512,6 +562,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (pct) pct.textContent = elem.formattedPercentage;
       if (zonesLabel) zonesLabel.textContent = elem.zones.join(', ');
     });
+
+    // 16 Bar Chart button needs a closed plot; keep the popup live while it is open
+    const hasZoneAreas = calculate16BarChart(state.metrics.zones16).hasData;
+    if (btnOpenBarChart) {
+      btnOpenBarChart.disabled = !hasZoneAreas;
+      btnOpenBarChart.title = hasZoneAreas ? 'Area share of each of the 16 directions' : 'Close the plot boundary first';
+    }
+    if (isBarChartOpen()) renderBarChart(state);
 
     // Update Positive Land Energy Analysis (needs Set Scale for real dimensions)
     const landData = calculatePositiveLandEnergy(state.metrics, cal);

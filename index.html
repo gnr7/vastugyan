@@ -490,6 +490,15 @@
             </div>
           </div>
           <div class="scale-status">Share of the plot's area in each element's zones</div>
+          <button id="btnOpenBarChart" class="btn btn-secondary btn-sm btn-block" disabled title="Close the plot boundary first">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="4" y1="20" x2="20" y2="20"/>
+              <rect x="5" y="11" width="3" height="9"/>
+              <rect x="10.5" y="6" width="3" height="14"/>
+              <rect x="16" y="14" width="3" height="6"/>
+            </svg>
+            View 16 Bar Chart
+          </button>
         </div>
 
         <!-- Section: Entrance Gate Assessment -->
@@ -529,6 +538,39 @@
         </div>
       </aside>
     </main>
+  </div>
+
+  <!-- 16 Direction Bar Chart Modal -->
+  <div id="barChartBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal-dialog modal-wide">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <h3 class="modal-title">16 Direction Bar Chart</h3>
+          <p class="modal-subtitle">Area distribution by direction — share of the plot's area in each compass zone</p>
+        </div>
+        <button id="btnBarChartClose" class="modal-close" title="Close">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <canvas id="barChartCanvas" class="bar-chart-canvas"></canvas>
+        <div class="bar-chart-stats">
+          <div class="bar-stat"><span class="bar-stat-label">Total Area</span><span class="bar-stat-value" id="barStatTotal">—</span></div>
+          <div class="bar-stat"><span class="bar-stat-label">Average</span><span class="bar-stat-value" id="barStatMean">—</span></div>
+          <div class="bar-stat"><span class="bar-stat-label">Max Direction</span><span class="bar-stat-value" id="barStatMax">—</span></div>
+          <div class="bar-stat"><span class="bar-stat-label">Min Direction</span><span class="bar-stat-value" id="barStatMin">—</span></div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btnBarChartPng" class="btn btn-secondary">Export PNG</button>
+        <button id="btnBarChartDone" class="btn btn-primary">Close</button>
+      </div>
+    </div>
   </div>
 
   <!-- Set Scale Modal -->

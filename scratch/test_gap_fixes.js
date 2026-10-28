@@ -15,7 +15,7 @@ import {
   setGridAlign,
   setRotation
 } from '../js/state.js';
-import { calculatePanchTatvaSummary, calculatePositiveLandEnergy, formatArea } from '../js/analysis.js';
+import { calculatePanchTatvaSummary, calculatePositiveLandEnergy, calculate16BarChart, formatArea } from '../js/analysis.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) <= eps * Math.max(1, Math.abs(a), Math.abs(b));
 let passed = 0;
@@ -172,6 +172,44 @@ test('centroid unchanged by alignment mode', () => {
   const b = setGridAlign('walls')(a);
   assert.deepEqual(a.metrics.centroid, b.metrics.centroid);
   assert.deepEqual(a.metrics.centroid, calculatePolygonCentroid(lShape));
+});
+
+console.log('16 Bar Chart');
+test('16 bars in compass order N → NNW that add up to 100%, average 6.25%', () => {
+  const chart = calculate16BarChart(recalculateMetrics(lShape, true, 0).zones16);
+  assert.equal(chart.bars.length, 16);
+  assert.equal(chart.bars[0].id, 'N');
+  assert.equal(chart.bars[15].id, 'NNW');
+  assert.ok(near(chart.bars.reduce((s, b) => s + b.pct, 0), 100));
+  assert.ok(near(chart.mean, 6.25));
+});
+test('symmetric rectangle gives matching opposite bars', () => {
+  const byId = Object.fromEntries(calculate16BarChart(recalculateMetrics(rect, true, 0).zones16).bars.map((b) => [b.id, b.pct]));
+  assert.ok(near(byId.N, byId.S) && near(byId.NE, byId.SW) && near(byId.E, byId.W));
+});
+test('colour groups follow the average and ±1 SD lines', () => {
+  const chart = calculate16BarChart(recalculateMetrics(lShape, true, 30).zones16);
+  chart.bars.forEach((b) => {
+    if (b.band === 'high') assert.ok(b.pct > chart.mean + chart.sd);
+    if (b.band === 'low') assert.ok(b.pct < chart.mean - chart.sd);
+    if (b.band === 'above') assert.ok(b.pct >= chart.mean && b.pct <= chart.mean + chart.sd + 1e-9);
+    if (b.band === 'below') assert.ok(b.pct < chart.mean && b.pct >= chart.mean - chart.sd - 1e-9);
+  });
+  assert.deepEqual(chart.strong, chart.bars.filter((b) => b.band === 'high').map((b) => b.id));
+});
+test('spread is the population SD of the 16 shares', () => {
+  const chart = calculate16BarChart(recalculateMetrics(lShape, true, 0).zones16);
+  const sd = Math.sqrt(chart.bars.reduce((s, b) => s + (b.pct - 6.25) ** 2, 0) / 16);
+  assert.ok(near(chart.sd, sd));
+});
+test('L-shape (notch in the SE) has its smallest share in a south-east zone', () => {
+  const chart = calculate16BarChart(recalculateMetrics(lShape, true, 0).zones16);
+  assert.ok(['ESE', 'SE', 'SSE'].includes(chart.min.id), `min was ${chart.min.id}`);
+  assert.ok(chart.max.pct > chart.min.pct);
+});
+test('no chart data before the plot is closed', () => {
+  assert.equal(calculate16BarChart(recalculateMetrics(rect, false, 0).zones16).hasData, false);
+  assert.equal(calculate16BarChart(null).hasData, false);
 });
 
 console.log(`\nAll ${passed} tests passed.`);

@@ -154,6 +154,13 @@ Open-source, local-first Vastu Shastra analysis web application inspired by prof
   - **Grid alignment toggle** (`#toggleGridWalls`, state `gridAlign`): *Off* keeps the old behaviour (9×9 grid, Devtas and Marma turn with North). *On* lays the grid on the plot's walls (minimum-area rectangle), choosing the side that faces nearest North as the grid's North side. Zones and entrances always follow North. `metrics.gridAngle` holds the angle the grid was laid at.
   - **Tests**: `scratch/test_gap_fixes.js` (19 assertions: zone areas sum to the plot area, gates tile the perimeter exactly and lie on the boundary, 60×40 ft gives 480/432/remainder 4, metre conversion, wall alignment on a 20° tilted plot). Older test scripts updated to the new function signatures. `test_phase7.js` still fails in Node (jsPDF needs a browser); this was already failing before these fixes.
 
+- [x] **New Feature: 16 Direction Bar Chart** (COMPLETED, 2026-10-28)
+  - `calculate16BarChart` in [`js/analysis.js`](js/analysis.js): each of the 16 zones' share of the real plot area (from `calculateZoneAreas`), in compass order N → NNW. The average is always 6.25% (shares sum to 100%); the spread is the population standard deviation over the 16 shares. Bars are grouped by `BAR_BANDS`: green *strong* (above avg + 1 SD), blue *above average*, light blue *below average*, red *weak* (below avg − 1 SD). Also returns max/min direction and the strong/weak lists.
+  - Renderer in [`js/barchart.js`](js/barchart.js) (`draw16BarChart`, `barChartToDataUrl`): high-DPI canvas with % labels, dashed average / ±1 SD lines and a two-row legend under the axis. The same drawing is used by the popup and the PDF.
+  - **Popup**: "View 16 Bar Chart" button under Panch Tatva Balance (disabled until the plot is closed). Shows the chart plus Total Area (real units once Set Scale is applied), Average ± SD, Max and Min Direction. Redraws live while open (dragging corners, rotation, undo). **Export PNG** saves the chart image.
+  - **PDF page 3** (only when a closed plot exists, otherwise the report stays at 2 pages): chart image, directional balance summary, strong/weak direction lists and a 16-row table (area, share, element, status). Page footers now say "of 3".
+  - Tests: 6 new assertions in `scratch/test_gap_fixes.js` (25 total), all passing. Checked live in the browser with an L-shaped plot: at 0° the max is SSW 12.8% and the min SE 0.9%; at 45° every bar shifts two places (SSE / E).
+
 ---
 
 ## Current Status
@@ -172,6 +179,7 @@ Open-source, local-first Vastu Shastra analysis web application inspired by prof
   12. Improved 32 Entrance Padas Visual Style (Segmented Perimeter, Dividers, Outward Badges)
   13. Positive Land Energy Analysis Module (Income Potential, Expenditure Tendency, Remainder Method, Ratio & Final Verdict)
   14. Gap fixes: Set Scale & real units, real-area Panch Tatva, angular 32 entrances on real walls, grid alignment toggle, rename
-- **Awaiting User Review & Approval** before proceeding to next features (Vithi Mandal / 16 Bar Chart).
+  15. 16 Direction Bar Chart (popup with Export PNG + PDF page 3)
+- **Awaiting User Review & Approval** before proceeding to the next feature (Vithi Mandal).
 
 
