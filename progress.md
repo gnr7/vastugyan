@@ -161,6 +161,16 @@ Open-source, local-first Vastu Shastra analysis web application inspired by prof
   - **PDF page 3** (only when a closed plot exists, otherwise the report stays at 2 pages): chart image, directional balance summary, strong/weak direction lists and a 16-row table (area, share, element, status). Page footers now say "of 3".
   - Tests: 6 new assertions in `scratch/test_gap_fixes.js` (25 total), all passing. Checked live in the browser with an L-shaped plot: at 0° the max is SSW 12.8% and the min SE 0.9%; at 45° every bar shifts two places (SSE / E).
 
+- [x] **Mobile & Tablet App Redesign** (COMPLETED, 2026-10-28)
+  - **Touch input** ([`js/canvas.js`](js/canvas.js)): pointer events for mouse, pen and touch. One finger: press-and-lift places a point (a magnifier above the finger shows the exact spot), drag corners with a 26 px grab radius, pan on empty canvas. Two fingers: pinch-zoom and pan around their midpoint; a second finger cancels a half-done drag. Lifting within 30 px of point 0 closes the boundary. Haptic ticks on Android.
+  - **Layout** ([`index.html`](index.html), [`css/style.css`](css/style.css), [`js/ui.js`](js/ui.js)): the canvas fills the screen. A bottom dock holds Draw, Scale, Layers, Analysis and Export. On phones one panel is a draggable bottom sheet (peek / half / full, flick to move a step). It hides while tracing and its peek shows the plot area and verdict. On tablet landscape and desktop (≥1024 px, or ≥900 px landscape) the same panel is a side panel with tabs and the dock floats as a pill. Dialogs become bottom sheets on phones. Safe-area insets handle notches and the home bar.
+  - **Design system "Ivory & saffron"**: sandalwood ivory, lamp-black ink, kesar saffron accent, temple brass, kumkum red; Marcellus (titles) + Hanken Grotesk (text, tabular figures); automatic dark mode; layer tiles; action rows; toasts instead of browser alerts; a 3-step first-run guide.
+  - **Brass compass dial** on the canvas: drag to turn North (haptic tick every 22.5°), tap for the North panel with a large dial, slider, ±1° steps and the grid-alignment switch.
+  - **Installable offline app**: `manifest.webmanifest`, icons in `icons/` (any, maskable, Apple touch), `sw.js` (network-first app shell, cache-first fonts). Verified in headless Chrome: registers, caches 22 files, reloads fully offline. (The Claude desktop browser pane doesn't run service workers.) Install action on Android/Chrome, Add to Home Screen hint on iOS.
+  - **Autosave** ([`js/persist.js`](js/persist.js)): boundary, North, scale, layers and the floor plan image are kept in IndexedDB and restored on launch. Start over clears them.
+  - **Sharing**: PDF, plan image and bar chart go to the phone's share sheet on touch devices and download elsewhere. **Take photo** opens the camera for a printed plan.
+  - Fixes found on the way: the start screen no longer reappears after "Use Blank Canvas"; fit-to-view handles plots that don't start at (0, 0) and keeps clear of the dock and sheet; the wide-layout canvas no longer grows taller than the window.
+
 ---
 
 ## Current Status
@@ -180,6 +190,7 @@ Open-source, local-first Vastu Shastra analysis web application inspired by prof
   13. Positive Land Energy Analysis Module (Income Potential, Expenditure Tendency, Remainder Method, Ratio & Final Verdict)
   14. Gap fixes: Set Scale & real units, real-area Panch Tatva, angular 32 entrances on real walls, grid alignment toggle, rename
   15. 16 Direction Bar Chart (popup with Export PNG + PDF page 3)
+  16. Mobile & tablet app redesign (touch, bottom sheet, compass dial, ivory & saffron, offline install, autosave, share)
 - **Awaiting User Review & Approval** before proceeding to the next feature (Vithi Mandal).
 
 
