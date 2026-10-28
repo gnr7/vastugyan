@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VastuGrid — Professional Vastu Purusha Mandala & Zonal Engine</title>
+  <meta name="description" content="Open-source local Vastu analysis tool: 9x9 Vastu Purusha Mandala, 45 Devtas, 16 directional zones, and 32 perimeter entrance padas.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Header (Google UI Flat Design) -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="app-brand">
+          <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="1"/>
+            <line x1="9" y1="3" x2="9" y2="21"/>
+            <line x1="15" y1="3" x2="15" y2="21"/>
+            <line x1="3" y1="9" x2="21" y2="9"/>
+            <line x1="3" y1="15" x2="21" y2="15"/>
+          </svg>
+          <div class="brand-info">
+            <span class="brand-title">VastuGrid</span>
+            <span class="brand-badge">Open Source · Local</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <input type="file" id="fileInput" accept="image/png, image/jpeg, image/webp" style="display: none;">
+        <button id="btnUpload" class="btn btn-primary" title="Upload floor plan drawing (PNG, JPG)">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          Upload Floor Plan
+        </button>
+
+        <button id="btnDrawPolygon" class="btn btn-secondary" title="Draw or edit property boundary polygon">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="12 2 22 8.5 17 21 7 21 2 8.5 12 2"/>
+          </svg>
+          Draw Boundary
+        </button>
+
+        <div class="header-divider"></div>
+
+        <button id="btnExportPng" class="btn btn-flat" title="Export high-resolution PNG">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <polyline points="21 15 16 10 5 21"/>
+          </svg>
+          Export PNG
+        </button>
+
+        <button id="btnExportPdf" class="btn btn-flat" title="Generate PDF Report">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
+          </svg>
+          PDF Report
+        </button>
+
+        <div class="header-divider"></div>
+
+        <!-- History: Undo & Redo -->
+        <button id="btnUndo" class="btn btn-icon-only btn-flat" title="Undo (Ctrl+Z)" disabled>
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 14 4 9 9 4"/>
+            <path d="M20 20v-7a4 4 0 0 0-4-4H4"/>
+          </svg>
+        </button>
+
+        <button id="btnRedo" class="btn btn-icon-only btn-flat" title="Redo (Ctrl+Y)" disabled>
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 14 20 9 15 4"/>
+            <path d="M4 20v-7a4 4 0 0 1 4-4h12"/>
+          </svg>
+        </button>
+
+        <div class="header-divider"></div>
+
+        <!-- Clear Boundary & Reset All -->
+        <button id="btnClearBoundary" class="btn btn-flat text-secondary" title="Clear boundary polygon and grid (keeps floor plan)">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 6h18"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+          Clear Boundary
+        </button>
+
+        <button id="btnResetAll" class="btn btn-flat text-danger" title="Reset everything to blank canvas">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="1 4 1 10 7 10"/>
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+          </svg>
+          Reset All
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace Layout -->
+    <main class="app-workspace">
+      <!-- Center Canvas Viewport -->
+      <div class="canvas-viewport" id="viewportContainer">
+        <canvas id="vastuCanvas"></canvas>
+
+        <!-- Floating Drafting Banner (Visible during boundary drawing) -->
+        <div class="drafting-banner" id="draftingBanner" style="display: none;">
+          <span class="drafting-dot"></span>
+          <span class="drafting-text">Click to place vertices · Click point 0 or double-click to close</span>
+          <button class="btn btn-primary btn-sm" id="btnFinishDraft">Done</button>
+        </div>
+
+        <!-- Empty state placeholder (visible when no plan loaded) -->
+        <div class="empty-state" id="emptyState">
+          <div class="empty-card">
+            <svg class="empty-icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="6" y="6" width="36" height="36" rx="2"/>
+              <line x1="18" y1="6" x2="18" y2="42"/>
+              <line x1="30" y1="6" x2="30" y2="42"/>
+              <line x1="6" y1="18" x2="42" y2="18"/>
+              <line x1="6" y1="30" x2="42" y2="30"/>
+            </svg>
+            <h3 class="empty-title">Upload Floor Plan or Start Drawing</h3>
+            <p class="empty-desc">Drop an architectural floor plan image (PNG, JPG) here, or use the boundary tool to draw your plot layout directly on the canvas.</p>
+            <div class="empty-actions">
+              <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                Select Image File
+              </button>
+              <button class="btn btn-secondary" id="btnBlankCanvas">
+                Use Blank Canvas
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Floating Viewport Controls (Bottom Left) -->
+        <div class="viewport-toolbar">
+          <button id="btnZoomIn" class="tool-btn" title="Zoom In (+)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </button>
+          <span class="zoom-indicator" id="zoomLevelText">100%</span>
+          <button id="btnZoomOut" class="tool-btn" title="Zoom Out (-)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </button>
+          <button id="btnZoomReset" class="tool-btn" title="Fit to View">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 3 21 3 21 9"/>
+              <polyline points="9 21 3 21 3 15"/>
+              <line x1="21" y1="3" x2="14" y2="10"/>
+              <line x1="3" y1="21" x2="10" y2="14"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Compass North Indicator Badge (Floating Top Right of Canvas) -->
+        <div class="compass-badge" id="compassBadge" title="True North Orientation">
+          <div class="compass-dial" id="compassDial">
+            <span class="needle-n">N</span>
+            <div class="needle-arrow"></div>
+          </div>
+          <span class="compass-deg" id="compassDegDisplay">0°</span>
+        </div>
+      </div>
+
+      <!-- Right Control Sidebar (Google UI Style) -->
+      <aside class="app-sidebar" id="appSidebar">
+        <!-- Section: Universal Rotation (North Calibration) -->
+        <div class="sidebar-section">
+          <div class="section-header">
+            <span class="section-title">Universal Rotation</span>
+            <span class="badge-value" id="rotationBadge">0°</span>
+          </div>
+          <div class="rotation-control-row">
+            <input type="range" id="rotationSlider" min="0" max="360" value="0" step="0.5" class="range-slider">
+          </div>
+          <div class="rotation-inputs-row">
+            <div class="input-with-unit">
+              <input type="number" id="rotationNumber" min="0" max="360" value="0" step="0.5" class="text-input">
+              <span class="input-unit">deg</span>
+            </div>
+            <button id="btnResetRotation" class="btn btn-flat btn-sm">Reset</button>
+          </div>
+        </div>
+
+        <!-- Section: Analytical Overlays & Toggles -->
+        <div class="sidebar-section">
+          <div class="section-header">
+            <span class="section-title">Vastu Overlays</span>
+          </div>
+
+          <div class="toggle-list">
+            <!-- 9x9 Grid -->
+            <label class="toggle-item">
+              <div class="toggle-info">
+                <span class="toggle-label">9×9 Vastu Grid</span>
+                <span class="toggle-sub">Classical 81 Padas matrix</span>
+              </div>
+              <div class="switch">
+                <input type="checkbox" id="toggleGrid9x9" checked>
+                <span class="slider"></span>
+              </div>
+            </label>
+
+            <!-- Brahmasthan -->
+            <label class="toggle-item">
+              <div class="toggle-info">
+                <span class="toggle-label">Brahmasthan</span>
+                <span class="toggle-sub">Central 3×3 (9 padas)</span>
+              </div>
+              <div class="switch">
+                <input type="checkbox" id="toggleBrahmasthan" checked>
+                <span class="slider"></span>
+              </div>
+            </label>
+
+            <!-- 45 Devtas -->
+            <label class="toggle-item">
+              <div class="toggle-info">
+                <span class="toggle-label">45 Devtas</span>
+                <span class="toggle-sub">All 32 outer + 13 inner devtas</span>
+              </div>
+              <div class="switch">
+                <input type="checkbox" id="toggleDevtas45">
+                <span class="slider"></span>
+              </div>
+            </label>
+
+            <!-- 45 Devtas Names -->
+            <label class="toggle-item">
+              <div class="toggle-info">
+                <span class="toggle-label">Devta Names</span>
+                <span class="toggle-sub">Text labels & pada numbers</span>
+              </div>
+              <div class="switch">
+                <input type="checkbox" id="toggleDevtaNames">
+                <span class="slider"></span>
+              </div>
+            </label>
+
+            <!-- 16 Directions -->
+            <label class="toggle-item">
+              <div class="toggle-info">
+                <span class="toggle-label">16 Directional Zones</span>
+                <span class="toggle-sub">22.5° rays from centroid</span>
+              </div>
+              <div class="switch">
+                <input type="checkbox" id="toggleZones16">
+                <span class="slider"></span>
+              </div>
+            </label>
+
+            <!-- 32 Perimeter Gates -->
+            <label class="toggle-item">
+              <div class="toggle-info">
+                <span class="toggle-label">32 Entrance Padas</span>
+                <span class="toggle-sub">N1–N8, E1–E8, S1–S8, W1–W8</span>
+              </div>
+              <div class="switch">
+                <input type="checkbox" id="toggleGates32">
+                <span class="slider"></span>
+              </div>
+            </label>
+
+            <!-- Marma Sthan -->
+            <label class="toggle-item">
+              <div class="toggle-info">
+                <span class="toggle-label">Marma Sthan</span>
+                <span class="toggle-sub">Sensitive diagonal energy lines</span>
+              </div>
+              <div class="switch">
+                <input type="checkbox" id="toggleMarma">
+                <span class="slider"></span>
+              </div>
+            </label>
+
+            <!-- Panch Tatva / Five Elements -->
+            <label class="toggle-item">
+              <div class="toggle-info">
+                <span class="toggle-label">Panch Tatva (5 Elements)</span>
+                <span class="toggle-sub">Elemental zonal colors</span>
+              </div>
+              <div class="switch">
+                <input type="checkbox" id="toggleElements">
+                <span class="slider"></span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Section: Property Boundary & Geometry Metrics -->
+        <div class="sidebar-section">
+          <div class="section-header">
+            <span class="section-title">Plot Area & Metrics</span>
+            <span class="badge-value" id="valAreaBadge">0 sq units</span>
+          </div>
+
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <span class="metric-title">Plot Area</span>
+              <span class="metric-value" id="valArea">0 sq units</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-title">Brahmasthan (3×3)</span>
+              <span class="metric-value" id="valBrahmaArea">—</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-title">Pada Size (1/81)</span>
+              <span class="metric-value" id="valPadaArea">—</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-title">Dimensions (W × H)</span>
+              <span class="metric-value" id="valDimensions">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Positive Land Energy Analysis (VastuGrid Authentic) -->
+        <div class="sidebar-section land-energy-section" id="landEnergySection">
+          <div class="section-header">
+            <span class="section-title">
+              <span class="energy-icon">⚡</span> Positive Land Energy
+            </span>
+            <span class="badge-value" id="landEnergyBadge">No Plot</span>
+          </div>
+
+          <!-- Dual Income & Expenditure Cards -->
+          <div class="energy-metrics-grid">
+            <div class="energy-card card-income">
+              <div class="energy-card-header">
+                <span class="energy-card-icon icon-up">↗</span>
+                <span class="energy-card-title">Income Potential</span>
+              </div>
+              <div class="energy-card-value" id="valLandIncome">0.00</div>
+              <div class="energy-card-sub" id="valLandIncomeFormula">Length: 0 × 8</div>
+            </div>
+
+            <div class="energy-card card-expenditure">
+              <div class="energy-card-header">
+                <span class="energy-card-icon icon-down">↘</span>
+                <span class="energy-card-title">Expenditure Tendency</span>
+              </div>
+              <div class="energy-card-value" id="valLandExpenditure">0.00</div>
+              <div class="energy-card-sub" id="valLandExpenditureFormula">Breadth: 0 × 10.8</div>
+            </div>
+          </div>
+
+          <!-- Comparison Indicator Card -->
+          <div class="energy-status-card status-good" id="cardIncomeComparison">
+            <div class="energy-status-header">
+              <span class="energy-status-icon" id="iconIncomeComparison">✔</span>
+              <span class="energy-status-title" id="titleIncomeComparison">Income > Expenditure</span>
+            </div>
+            <div class="energy-status-sub" id="subIncomeComparison">Good financial prospects for this land</div>
+          </div>
+
+          <!-- Energy Pattern (Remainder Method) -->
+          <div class="energy-status-card status-pattern" id="cardEnergyPattern">
+            <div class="energy-pattern-header">
+              <span class="energy-pattern-label" id="labelEnergyPattern">Energy Pattern (Remainder: —)</span>
+            </div>
+            <div class="energy-status-row">
+              <span class="energy-status-icon" id="iconEnergyPattern">✔</span>
+              <span class="energy-status-desc" id="descEnergyPattern">Close boundary to compute pattern</span>
+            </div>
+            <div class="energy-calc-sub" id="calcEnergyPattern">(L + B) ÷ 8 = remainder</div>
+          </div>
+
+          <!-- Length Proportion (Ratio) -->
+          <div class="energy-status-card status-ratio" id="cardLengthProportion">
+            <div class="energy-pattern-header">
+              <span class="energy-pattern-label" id="labelLengthProportion">Length Proportion (Ratio: —)</span>
+            </div>
+            <div class="energy-status-row">
+              <span class="energy-status-icon" id="iconLengthProportion">✔</span>
+              <span class="energy-status-desc" id="descLengthProportion">Positive Energy (Length proportion good)</span>
+            </div>
+            <div class="energy-calc-sub" id="calcLengthProportion">Length should be ≤ 2.5 × Breadth</div>
+          </div>
+
+          <!-- Final Land Energy Verdict -->
+          <div class="energy-verdict-box verdict-recommended" id="cardLandVerdict">
+            <div class="verdict-tag" id="tagLandVerdict">🎯 RECOMMENDED LAND</div>
+            <div class="verdict-summary" id="summaryLandVerdict">
+              This land shows predominantly positive Vastu energy patterns suitable for prosperity and well-being.
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Panch Tatva (5 Elements) Distribution -->
+        <div class="sidebar-section">
+          <div class="section-header">
+            <span class="section-title">Panch Tatva Balance</span>
+            <span class="badge-value">5 Elements</span>
+          </div>
+
+          <!-- Stacked Segmented Progress Bar -->
+          <div class="elemental-bar" id="elementalBar" title="Elemental Distribution across 16 Zones">
+            <div class="elemental-segment seg-water" style="width: 18.75%" title="Water: 18.75%"></div>
+            <div class="elemental-segment seg-air" style="width: 18.75%" title="Air: 18.75%"></div>
+            <div class="elemental-segment seg-fire" style="width: 18.75%" title="Fire: 18.75%"></div>
+            <div class="elemental-segment seg-earth" style="width: 12.50%" title="Earth: 12.50%"></div>
+            <div class="elemental-segment seg-space" style="width: 31.25%" title="Space: 31.25%"></div>
+          </div>
+
+          <!-- Elemental Distribution Legend / List -->
+          <div class="elemental-list">
+            <div class="elemental-row">
+              <div class="elem-label">
+                <span class="elem-dot dot-water"></span>
+                <span class="elem-name">Water (Jal)</span>
+              </div>
+              <span class="elem-zones">N, NNE, NE</span>
+              <span class="elem-pct">18.8%</span>
+            </div>
+            <div class="elemental-row">
+              <div class="elem-label">
+                <span class="elem-dot dot-air"></span>
+                <span class="elem-name">Air (Vayu)</span>
+              </div>
+              <span class="elem-zones">ENE, E, ESE</span>
+              <span class="elem-pct">18.8%</span>
+            </div>
+            <div class="elemental-row">
+              <div class="elem-label">
+                <span class="elem-dot dot-fire"></span>
+                <span class="elem-name">Fire (Agni)</span>
+              </div>
+              <span class="elem-zones">SE, SSE, S</span>
+              <span class="elem-pct">18.8%</span>
+            </div>
+            <div class="elemental-row">
+              <div class="elem-label">
+                <span class="elem-dot dot-earth"></span>
+                <span class="elem-name">Earth (Prithvi)</span>
+              </div>
+              <span class="elem-zones">SSW, SW</span>
+              <span class="elem-pct">12.5%</span>
+            </div>
+            <div class="elemental-row">
+              <div class="elem-label">
+                <span class="elem-dot dot-space"></span>
+                <span class="elem-name">Space (Akash)</span>
+              </div>
+              <span class="elem-zones">WSW..NNW</span>
+              <span class="elem-pct">31.2%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Entrance Gate Assessment -->
+        <div class="sidebar-section">
+          <div class="section-header">
+            <span class="section-title">Entrance Gateways</span>
+            <span class="badge-value badge-success">8 Auspicious</span>
+          </div>
+
+          <div class="gate-assessment-grid">
+            <div class="gate-card gate-auspicious">
+              <span class="gate-dir">North</span>
+              <span class="gate-code">N3, N4</span>
+              <span class="gate-sub">Mukhya, Bhallata</span>
+            </div>
+            <div class="gate-card gate-auspicious">
+              <span class="gate-dir">East</span>
+              <span class="gate-code">E3, E4</span>
+              <span class="gate-sub">Jayanta, Indra</span>
+            </div>
+            <div class="gate-card gate-auspicious">
+              <span class="gate-dir">South</span>
+              <span class="gate-code">S3, S4</span>
+              <span class="gate-sub">Vitatha, Brihatkshata</span>
+            </div>
+            <div class="gate-card gate-auspicious">
+              <span class="gate-dir">West</span>
+              <span class="gate-code">W3, W4</span>
+              <span class="gate-sub">Sugriva, Pushpadanta</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer / Instructions Card -->
+        <div class="sidebar-footer">
+          <span class="footer-note">Navigation: Drag with mouse to pan · Scroll wheel to zoom · Click vertices to draft boundary</span>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <!-- PDF Report Details Modal (Google UI Design) -->
+  <div id="pdfModalBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <h3 class="modal-title">PDF Report Details</h3>
+          <p class="modal-subtitle">Add your details to include them on every page of the PDF report (optional).</p>
+        </div>
+        <button id="btnPdfModalClose" class="modal-close" title="Close modal">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label" for="pdfName">Name</label>
+          <input type="text" id="pdfName" class="form-input" placeholder="Enter your name" autocomplete="name">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="pdfPhone">Phone</label>
+          <input type="tel" id="pdfPhone" class="form-input" placeholder="Enter your phone number" autocomplete="tel">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="pdfAddress">Address</label>
+          <input type="text" id="pdfAddress" class="form-input" placeholder="Enter your address" autocomplete="street-address">
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btnPdfModalSkip" class="btn btn-secondary">Skip & Generate</button>
+        <button id="btnPdfModalGenerate" class="btn btn-primary">Generate PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vendor: Local client-side jsPDF for offline report generation -->
+  <script src="js/vendor/jspdf.umd.min.js"></script>
+
+  <!-- Application Module -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

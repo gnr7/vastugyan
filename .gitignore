@@ -1,0 +1,9 @@
+# Throwaway headless-browser profiles from testing
+scratch/chrome_profile*/
+
+# Reference captures of the commercial vastugrid.com site (not ours to redistribute)
+*.pdf
+scratch/page_img_*.png
+scratch/img*_preview.png
+scratch/positive_land_energy_card.png
+scratch/slide6.png

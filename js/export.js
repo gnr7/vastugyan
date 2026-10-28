@@ -1,0 +1,326 @@
+/**
+ * VastuGrid — Client-Side Export Engine (PNG & Professional PDF Report)
+ * Generates high-resolution PNG captures and multi-page client-ready PDF reports.
+ */
+
+import { calculateAreaMetrics, calculatePanchTatvaSummary, calculateGateAssessment, calculatePositiveLandEnergy } from './analysis.js';
+
+/**
+ * Export canvas view directly to high-resolution PNG file
+ * @param {HTMLCanvasElement} canvas
+ * @param {string} filename
+ */
+export const exportCanvasToPng = (canvas, filename = '') => {
+  if (!canvas) {
+    alert('Canvas element not found.');
+    return;
+  }
+
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const name = filename || `VastuGrid-Plan-${dateStr}.png`;
+
+  const dataUrl = canvas.toDataURL('image/png', 1.0);
+  const link = document.createElement('a');
+  link.download = name;
+  link.href = dataUrl;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+/**
+ * Generate multi-page professional PDF client report
+ * @param {HTMLCanvasElement} canvas
+ * @param {Object} state
+ * @param {string} filename
+ * @param {Object} clientInfo
+ */
+export const generatePdfReport = async (canvas, state, filename = '', clientInfo = {}) => {
+  if (!window.jspdf) {
+    alert('PDF export library is still loading. Please try again in a moment.');
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const reportName = filename || `VastuGrid-Report-${dateStr}.pdf`;
+
+  // Client personal details (optional)
+  const clientName = (clientInfo.name || '').trim();
+  const clientPhone = (clientInfo.phone || '').trim();
+  const clientAddress = (clientInfo.address || '').trim();
+  const hasClient = !!(clientName || clientPhone || clientAddress);
+
+  // Calculate metrics and analysis
+  const areaData = calculateAreaMetrics(state.metrics);
+  const tatvaData = calculatePanchTatvaSummary();
+  const gateData = calculateGateAssessment(state.metrics.entranceGates32);
+  const landData = calculatePositiveLandEnergy(state.metrics);
+
+  // Palette constants
+  const primaryBlue = [26, 115, 232];
+  const darkCharcoal = [32, 33, 36];
+  const mediumGray = [95, 99, 104];
+  const lightBg = [248, 249, 250];
+  const successGreen = [30, 142, 62];
+
+  // ==================== PAGE 1: Executive Overview & Visual Plan ====================
+
+  // Header Banner
+  doc.setFillColor(...primaryBlue);
+  doc.rect(0, 0, 210, 18, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(255, 255, 255);
+  doc.text('VASTUGRID — PROFESSIONAL VASTU PURUSHA MANDALA REPORT', 14, 12);
+
+  // Subheader info (with optional Client Info)
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...mediumGray);
+  if (hasClient) {
+    const details = [
+      clientName ? `Client: ${clientName}` : '',
+      clientPhone ? `Phone: ${clientPhone}` : '',
+      clientAddress ? `Address: ${clientAddress}` : ''
+    ].filter(Boolean).join('  |  ');
+    doc.text(details, 14, 22.5);
+    doc.text(`Generated: ${new Date().toLocaleDateString()} | True North Orientation: ${state.rotation}° | Mandala: 81 Padas (Paramasayika)`, 14, 26.5);
+  } else {
+    doc.text(`Generated: ${new Date().toLocaleDateString()} | True North Orientation: ${state.rotation}° | Mandala: 81 Padas (Paramasayika)`, 14, 25);
+  }
+
+  // Divider
+  doc.setDrawColor(218, 220, 224);
+  doc.setLineWidth(0.3);
+  doc.line(14, 28.5, 196, 28.5);
+
+  // Embed High-Res Canvas Snapshot
+  if (canvas) {
+    const canvasDataUrl = canvas.toDataURL('image/png', 0.95);
+    const planWidth = 182;
+    const planHeight = 115;
+    const planX = 14;
+    const planY = 32;
+
+    // Background card border for visual plan
+    doc.setFillColor(...lightBg);
+    doc.rect(planX - 1, planY - 1, planWidth + 2, planHeight + 2, 'F');
+    doc.setDrawColor(218, 220, 224);
+    doc.rect(planX - 1, planY - 1, planWidth + 2, planHeight + 2, 'S');
+
+    doc.addImage(canvasDataUrl, 'PNG', planX, planY, planWidth, planHeight);
+  }
+
+  // Key Area Metrics Card (Page 1 bottom)
+  let yPos = 154;
+  doc.setFillColor(...lightBg);
+  doc.rect(14, yPos, 182, 35, 'F');
+  doc.setDrawColor(218, 220, 224);
+  doc.rect(14, yPos, 182, 35, 'S');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(...darkCharcoal);
+  doc.text('EXECUTIVE AREA & GEOMETRY SUMMARY', 20, yPos + 8);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(...darkCharcoal);
+
+  // Column 1
+  doc.text(`Total Plot Area: ${Math.round(areaData.plotArea).toLocaleString()} sq units`, 20, yPos + 16);
+  doc.text(`Brahmasthan (3×3 Core): ${Math.round(areaData.brahmasthanArea).toLocaleString()} sq units (${areaData.brahmasthanRatioPct}%)`, 20, yPos + 23);
+  doc.text(`Bounding Dimensions: ${Math.round(areaData.width)} × ${Math.round(areaData.height)} units`, 20, yPos + 30);
+
+  // Column 2
+  doc.text(`Single Pada Area (1/81): ${Math.round(areaData.padaArea).toLocaleString()} sq units`, 110, yPos + 16);
+  doc.text(`Universal Rotation: ${state.rotation}° (North Calibrated)`, 110, yPos + 23);
+  doc.text(`Boundary Vertices: ${state.polygon.length} points (${state.isPolygonClosed ? 'Closed Polygon' : 'Draft'})`, 110, yPos + 30);
+
+  // Executive Vastu Insights Box
+  yPos = 194;
+  const boxHeight = landData.isActive ? 38 : 32;
+  doc.setFillColor(230, 244, 234); // soft green
+  doc.rect(14, yPos, 182, boxHeight, 'F');
+  doc.setDrawColor(...successGreen);
+  doc.setLineWidth(0.5);
+  doc.rect(14, yPos, 182, boxHeight, 'S');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10.5);
+  doc.setTextColor(...successGreen);
+  doc.text('VASTU COMPLIANCE & OBSERVATIONS', 20, yPos + 7);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(...darkCharcoal);
+  doc.text('• Brahmasthan is accurately identified at the central 9 padas. Keep this zone free of heavy load, pillars, and cuts.', 20, yPos + 14);
+  doc.text('• 8 Classical Auspicious Gateways identified: N3/N4 (North), E3/E4 (East), S3/S4 (South), and W3/W4 (West).', 20, yPos + 20);
+  doc.text('• 16 Directional Zones radiate at 22.5° intervals from the geometric center of mass (centroid).', 20, yPos + 26);
+  if (landData.isActive) {
+    doc.text(`• Positive Land Energy: ${landData.verdict.title} (Income: ${landData.income} vs Expenditure: ${landData.expenditure} | Remainder: ${landData.remainder} | Ratio: ${landData.ratio})`, 20, yPos + 32);
+  }
+
+  // Page 1 Footer
+  doc.setFontSize(8);
+  doc.setTextColor(...mediumGray);
+  if (hasClient) {
+    const clientSummary = [clientName, clientPhone].filter(Boolean).join(' · ');
+    doc.text(`Page 1 of 2 — Prepared for: ${clientSummary}`, 14, 287);
+  } else {
+    doc.text('Page 1 of 2 — VastuGrid Client Report', 14, 287);
+  }
+  doc.text('Open Source · Local-First Vastu Analysis Tool', 135, 287);
+
+  // ==================== PAGE 2: Panch Tatva & 32 Gateways ====================
+  doc.addPage();
+
+  // Page 2 Header Banner
+  doc.setFillColor(...primaryBlue);
+  doc.rect(0, 0, 210, 14, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(255, 255, 255);
+  doc.text('PANCH TATVA (FIVE ELEMENTS) & 32 GATEWAY ASSESSMENT', 14, 9.5);
+
+  if (hasClient && clientName) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text(`Client: ${clientName}`, 196, 9.5, { align: 'right' });
+  }
+
+  // Section 1: Panch Tatva Elemental Distribution
+  yPos = 24;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(...darkCharcoal);
+  doc.text('1. Panch Tatva (Five Elements) Distribution', 14, yPos);
+
+  yPos += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(...mediumGray);
+  doc.text('Energy balance across the 16 directional zones in the property:', 14, yPos);
+
+  yPos += 5;
+  // Table Header
+  doc.setFillColor(...lightBg);
+  doc.rect(14, yPos, 182, 8, 'F');
+  doc.setDrawColor(218, 220, 224);
+  doc.rect(14, yPos, 182, 8, 'S');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(...darkCharcoal);
+  doc.text('Element', 18, yPos + 5.5);
+  doc.text('Directional Zones', 60, yPos + 5.5);
+  doc.text('Share (%)', 120, yPos + 5.5);
+  doc.text('Core Vastu Attribute', 145, yPos + 5.5);
+
+  // Table Rows
+  yPos += 8;
+  tatvaData.forEach((item) => {
+    doc.setFillColor(255, 255, 255);
+    doc.rect(14, yPos, 182, 9, 'F');
+    doc.setDrawColor(241, 243, 244);
+    doc.rect(14, yPos, 182, 9, 'S');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...darkCharcoal);
+    doc.text(item.name, 18, yPos + 6);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text(item.zones.join(', '), 60, yPos + 6);
+    doc.text(item.formattedPercentage, 120, yPos + 6);
+    doc.text(item.significance, 145, yPos + 6);
+
+    yPos += 9;
+  });
+
+  // Section 2: 32 Entrance Gateways Assessment
+  yPos += 10;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(...darkCharcoal);
+  doc.text('2. 32 Perimeter Entrance Gateway Assessment', 14, yPos);
+
+  yPos += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(...mediumGray);
+  doc.text('Traditional evaluation of all 32 perimeter gateway padas along the plot boundary:', 14, yPos);
+
+  yPos += 6;
+  const directions = [
+    { title: 'NORTH (Kubera / Water)', codes: 'N1 - N8', auspicious: 'N3 (Mukhya), N4 (Bhallata)', bless: 'Abundant wealth, sustained prosperity, and spiritual growth' },
+    { title: 'EAST (Indra / Air)', codes: 'E1 - E8', auspicious: 'E3 (Jayanta), E4 (Indra)', bless: 'Victorious life, influential social connections, and royal status' },
+    { title: 'SOUTH (Yama / Fire)', codes: 'S1 - S8', auspicious: 'S3 (Vitatha), S4 (Brihatkshata)', bless: 'Material expansion, clever prosperity, and dynamic willpower' },
+    { title: 'WEST (Varuna / Space)', codes: 'W1 - W8', auspicious: 'W3 (Sugriva), W4 (Pushpadanta)', bless: 'Profitable alliances, vehicle acquisition, and steady savings' }
+  ];
+
+  directions.forEach((d) => {
+    doc.setFillColor(...lightBg);
+    doc.rect(14, yPos, 182, 16, 'F');
+    doc.setDrawColor(218, 220, 224);
+    doc.rect(14, yPos, 182, 16, 'S');
+
+    // Direction title
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...primaryBlue);
+    doc.text(d.title, 18, yPos + 5.5);
+
+    // Auspicious badge
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...successGreen);
+    doc.text(`Auspicious Gates: ${d.auspicious}`, 18, yPos + 10.5);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...mediumGray);
+    doc.text(`Blessings: ${d.bless}`, 18, yPos + 14.5);
+
+    yPos += 18;
+  });
+
+  // Section 3: 45 Devtas Paramasayika Mandala Summary
+  yPos += 4;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(...darkCharcoal);
+  doc.text('3. 45 Devtas Paramasayika Structure', 14, yPos);
+
+  yPos += 6;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...darkCharcoal);
+  doc.text('• Central Creator (Brahmasthan): Brahma (#1) spanning 9 central padas (rows 4..6, cols 4..6).', 14, yPos);
+  doc.text('• 4 Cardinal Inner Devtas: Aryama (East, 6 padas), Vivaswan (South, 6 padas), Mitra (West, 6 padas), Bhudhar (North, 6 padas).', 14, yPos + 5);
+  doc.text('• 8 Diagonal Inner Devtas: Aapa/Aapavatsa (NE), Savita/Savitra (SE), Indra/Jaya (SW), Rudra/Rajayakshma (NW) (2 padas each).', 14, yPos + 10);
+  doc.text('• 32 Perimeter Devtas: 1 pada each along all 4 perimeter edges forming the 32 Gateway matrix.', 14, yPos + 15);
+
+  // Page 2 Footer
+  doc.setFontSize(8);
+  doc.setTextColor(...mediumGray);
+  if (hasClient) {
+    const clientSummary = [clientName, clientPhone].filter(Boolean).join(' · ');
+    doc.text(`Page 2 of 2 — Prepared for: ${clientSummary}`, 14, 287);
+  } else {
+    doc.text('Page 2 of 2 — VastuGrid Client Report', 14, 287);
+  }
+  doc.text('Open Source · Local-First Vastu Analysis Tool', 135, 287);
+
+  // Save PDF file
+  doc.save(reportName);
+};
