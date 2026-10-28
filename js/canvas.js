@@ -11,8 +11,50 @@ import {
   setHoverVertex,
   setDraggingVertex,
   setCursorWorldPos,
-  addCalibrationPoint
+  addCalibrationPoint,
+  recalculateMetrics
 } from './state.js';
+
+// Touch ergonomics: finger-sized hit areas and a magnifier while placing or dragging points
+const TOUCH_HIT_RADIUS = 26;   // px around a vertex that a finger can grab
+const TOUCH_SNAP_RADIUS = 30;  // px from point 0 that closes the boundary on lift
+const LOUPE_RADIUS = 56;
+const LOUPE_ZOOM = 2.5;
+
+// Short vibration on supporting phones (Android); silently ignored elsewhere
+const haptic = (pattern) => {
+  try {
+    navigator.vibrate?.(pattern);
+  } catch {
+    /* not supported */
+  }
+};
+
+// Canvas chrome colours, read from the CSS design tokens so light and dark themes match
+export const THEME = {
+  paper: '#FFFCF6',
+  ink: '#2A1F17',
+  brass: '#B08D3C',
+  saffron: '#C2681C',
+  kumkum: '#B3261E',
+  canvasLine: 'rgba(42, 31, 23, 0.06)',
+  boundary: '#C2681C',
+  boundaryFill: 'rgba(194, 104, 28, 0.08)'
+};
+
+export const refreshTheme = () => {
+  if (typeof getComputedStyle !== 'function' || typeof document === 'undefined') return;
+  const css = getComputedStyle(document.documentElement);
+  const read = (name, fallback) => (css.getPropertyValue(name).trim() || fallback);
+  THEME.paper = read('--paper', THEME.paper);
+  THEME.ink = read('--ink', THEME.ink);
+  THEME.brass = read('--brass', THEME.brass);
+  THEME.saffron = read('--saffron', THEME.saffron);
+  THEME.kumkum = read('--kumkum', THEME.kumkum);
+  THEME.canvasLine = read('--canvas-line', THEME.canvasLine);
+  THEME.boundary = read('--boundary', THEME.boundary);
+  THEME.boundaryFill = read('--boundary-fill', THEME.boundaryFill);
+};
 
 // Pure coordinate transformation functions
 export const screenToWorld = (screenX, screenY, viewport) => ({
@@ -53,7 +95,7 @@ export const drawBackgroundGrid = (ctx, viewport, width, height) => {
   const offsetY = viewport.y % gridSize;
 
   ctx.save();
-  ctx.strokeStyle = '#e8eaed';
+  ctx.strokeStyle = THEME.canvasLine;
   ctx.lineWidth = 1;
   ctx.beginPath();
 
@@ -76,7 +118,7 @@ export const drawFloorPlanImage = (ctx, image) => {
 
   ctx.save();
   // Draw subtle floor plan border & shadow
-  ctx.shadowColor = 'rgba(60, 64, 67, 0.15)';
+  ctx.shadowColor = 'rgba(42, 31, 23, 0.16)';
   ctx.shadowBlur = 12;
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 4;
@@ -84,7 +126,7 @@ export const drawFloorPlanImage = (ctx, image) => {
   ctx.drawImage(image.element, 0, 0, image.width, image.height);
 
   ctx.shadowColor = 'transparent';
-  ctx.strokeStyle = '#dadce0';
+  ctx.strokeStyle = 'rgba(42, 31, 23, 0.14)';
   ctx.lineWidth = 1;
   ctx.strokeRect(0, 0, image.width, image.height);
 
@@ -113,16 +155,16 @@ export const drawPolygon = (ctx, state) => {
 
     if (isPolygonClosed) {
       ctx.closePath();
-      ctx.fillStyle = 'rgba(26, 115, 232, 0.08)';
+      ctx.fillStyle = THEME.boundaryFill;
       ctx.fill();
 
-      ctx.strokeStyle = '#1a73e8';
+      ctx.strokeStyle = THEME.boundary;
       ctx.lineWidth = lw;
       ctx.setLineDash([]);
       ctx.stroke();
     } else {
       // Drafting mode: draw established segments
-      ctx.strokeStyle = '#1a73e8';
+      ctx.strokeStyle = THEME.boundary;
       ctx.lineWidth = lw;
       ctx.setLineDash([6 / scale, 4 / scale]);
       ctx.stroke();
@@ -132,9 +174,11 @@ export const drawPolygon = (ctx, state) => {
         ctx.beginPath();
         ctx.moveTo(polygon[n - 1].x, polygon[n - 1].y);
         ctx.lineTo(cursorWorldPos.x, cursorWorldPos.y);
-        ctx.strokeStyle = 'rgba(26, 115, 232, 0.6)';
+        ctx.strokeStyle = THEME.boundary;
+        ctx.globalAlpha = 0.65;
         ctx.setLineDash([4 / scale, 4 / scale]);
         ctx.stroke();
+        ctx.globalAlpha = 1;
       }
     }
   }
@@ -151,26 +195,26 @@ export const drawPolygon = (ctx, state) => {
     // Outer circle
     ctx.beginPath();
     ctx.arc(vertex.x, vertex.y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = THEME.paper;
     ctx.fill();
 
     ctx.lineWidth = 2 / scale;
     ctx.setLineDash([]);
-    ctx.strokeStyle = isFirstInDraft ? '#1e8e3e' : (isDragging ? '#1557b0' : '#1a73e8');
+    ctx.strokeStyle = isFirstInDraft ? '#1e7a4a' : (isDragging ? THEME.ink : THEME.boundary);
     ctx.stroke();
 
     // Pulse / snap ring for vertex 0 when ready to close
     if (isFirstInDraft && isHovered) {
       ctx.beginPath();
       ctx.arc(vertex.x, vertex.y, radius + 4 / scale, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(30, 142, 62, 0.5)';
+      ctx.strokeStyle = 'rgba(30, 122, 74, 0.55)';
       ctx.lineWidth = 1.5 / scale;
       ctx.stroke();
     }
 
     // Number badge (Google UI style label)
     const fontSize = Math.max(10, Math.min(13, 11 / Math.sqrt(scale)));
-    ctx.font = `600 ${fontSize}px Inter, sans-serif`;
+    ctx.font = `600 ${fontSize}px 'Hanken Grotesk', sans-serif`;
     const label = `${idx}`;
     const textWidth = ctx.measureText(label).width;
 
@@ -178,10 +222,10 @@ export const drawPolygon = (ctx, state) => {
     const badgeY = vertex.y - 9 / scale;
     const pad = 2 / scale;
 
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.fillStyle = THEME.paper;
     ctx.fillRect(badgeX - pad, badgeY - fontSize + pad, textWidth + pad * 2, fontSize + pad);
 
-    ctx.fillStyle = '#202124';
+    ctx.fillStyle = THEME.ink;
     ctx.fillText(label, badgeX, badgeY);
   });
 
@@ -200,16 +244,16 @@ export const drawCentroidMarker = (ctx, centroid, scale) => {
   // Subtle outer pulse circle
   ctx.beginPath();
   ctx.arc(centroid.x, centroid.y, outerR, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(217, 48, 37, 0.15)';
+  ctx.fillStyle = 'rgba(179, 38, 30, 0.14)';
   ctx.fill();
-  ctx.strokeStyle = 'rgba(217, 48, 37, 0.4)';
+  ctx.strokeStyle = 'rgba(179, 38, 30, 0.4)';
   ctx.lineWidth = 1 / scale;
   ctx.stroke();
 
   // Central red dot
   ctx.beginPath();
   ctx.arc(centroid.x, centroid.y, r, 0, Math.PI * 2);
-  ctx.fillStyle = '#d93025';
+  ctx.fillStyle = THEME.kumkum;
   ctx.fill();
 
   // Center white pinpoint
@@ -220,8 +264,8 @@ export const drawCentroidMarker = (ctx, centroid, scale) => {
 
   // Small label badge below centroid
   const fontSize = Math.max(9, Math.min(11, 10 / Math.sqrt(scale)));
-  ctx.font = `600 ${fontSize}px Inter, sans-serif`;
-  ctx.fillStyle = '#d93025';
+  ctx.font = `600 ${fontSize}px 'Hanken Grotesk', sans-serif`;
+  ctx.fillStyle = THEME.kumkum;
   ctx.textAlign = 'center';
   ctx.fillText('Centroid', centroid.x, centroid.y + outerR + fontSize);
 
@@ -391,10 +435,10 @@ export const draw45Devtas = (ctx, devtaFields, scale, layers, angleDeg = 0) => {
         : `#${devta.number}`;
 
       // Measure text for background pill halo
-      ctx.font = `600 ${titleFontSize}px Inter, sans-serif`;
+      ctx.font = `600 ${titleFontSize}px 'Hanken Grotesk', sans-serif`;
       const titleWidth = ctx.measureText(titleText).width;
 
-      ctx.font = `400 ${subFontSize}px Inter, sans-serif`;
+      ctx.font = `400 ${subFontSize}px 'Hanken Grotesk', sans-serif`;
       const subWidth = ctx.measureText(subText).width;
 
       const maxWidth = Math.max(titleWidth, subWidth);
@@ -416,14 +460,14 @@ export const draw45Devtas = (ctx, devtaFields, scale, layers, angleDeg = 0) => {
       // Render Title (Devta Name)
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = `600 ${titleFontSize}px Inter, sans-serif`;
+      ctx.font = `600 ${titleFontSize}px 'Hanken Grotesk', sans-serif`;
       ctx.fillStyle = devta.category === 'central'
         ? '#d93025'
         : (devta.isAuspiciousEntrance ? '#137333' : '#202124');
       ctx.fillText(titleText, 0, -subFontSize / 2);
 
       // Render Subtitle (Number / Entrance Code)
-      ctx.font = `500 ${subFontSize}px Inter, sans-serif`;
+      ctx.font = `500 ${subFontSize}px 'Hanken Grotesk', sans-serif`;
       ctx.fillStyle = devta.isAuspiciousEntrance ? '#188038' : '#5f6368';
       ctx.fillText(subText, 0, titleFontSize / 2 + 1 / scale);
 
@@ -482,7 +526,7 @@ export const draw16Zones = (ctx, zones16, scale, layers) => {
     ctx.translate(z.labelPos.x, z.labelPos.y);
 
     const labelText = z.short;
-    ctx.font = `600 ${fontSizeWorld}px Inter, sans-serif`;
+    ctx.font = `600 ${fontSizeWorld}px 'Hanken Grotesk', sans-serif`;
     const textW = ctx.measureText(labelText).width;
     const padX = 4 / scale;
     const padY = 2 / scale;
@@ -593,7 +637,7 @@ export const draw32EntranceGates = (ctx, entranceGates32, scale, layers, angleDe
 
     const badgeText = gate.isAuspicious ? `★ ${gate.code}` : gate.code;
 
-    ctx.font = `600 ${fontSizeWorld}px Inter, sans-serif`;
+    ctx.font = `600 ${fontSizeWorld}px 'Hanken Grotesk', sans-serif`;
     const textW = ctx.measureText(badgeText).width;
     const padX = 5 / scale;
     const padY = 2.5 / scale;
@@ -748,12 +792,294 @@ export class CanvasController {
     const resizeObserver = new ResizeObserver(() => this.handleResize());
     resizeObserver.observe(this.canvas.parentElement);
 
-    // Mouse Pan, Vertex Drag, and Polygon Drafting
-    this.canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
-    window.addEventListener('mousemove', (e) => this.onMouseMove(e));
-    window.addEventListener('mouseup', (e) => this.onMouseUp(e));
+    // Pointer events cover mouse, pen and touch. Mouse keeps its click-to-place behaviour;
+    // touch uses press-and-lift with a magnifier, and two fingers pinch-zoom and pan.
+    this.pointers = new Map();   // active touch pointers: id -> { x, y } (canvas-local px)
+    this.touch = null;           // current one-finger touch gesture
+    this.pinch = null;           // current two-finger gesture
+    this.loupe = null;           // { x, y } screen point shown magnified, or null
+
+    this.canvas.style.touchAction = 'none';
+    this.canvas.addEventListener('pointerdown', (e) => this.onPointerDown(e));
+    this.canvas.addEventListener('pointermove', (e) => this.onPointerMove(e));
+    this.canvas.addEventListener('pointerup', (e) => this.onPointerUp(e));
+    this.canvas.addEventListener('pointercancel', (e) => this.onPointerUp(e, true));
     this.canvas.addEventListener('dblclick', (e) => this.onDblClick(e));
     this.canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
+    this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  // ---------- Pointer routing ----------
+
+  localPoint(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  onPointerDown(e) {
+    try {
+      this.canvas.setPointerCapture(e.pointerId);
+    } catch {
+      /* pointer already gone; capture is only a convenience */
+    }
+    if (e.pointerType !== 'touch') {
+      this.onMouseDown(e);
+      return;
+    }
+    e.preventDefault();
+    this.pointers.set(e.pointerId, this.localPoint(e));
+
+    if (this.pointers.size === 2) {
+      this.cancelTouchGesture();
+      this.startPinch();
+    } else if (this.pointers.size === 1) {
+      this.startTouch(e);
+    }
+  }
+
+  onPointerMove(e) {
+    if (e.pointerType !== 'touch') {
+      this.onMouseMove(e);
+      return;
+    }
+    if (!this.pointers.has(e.pointerId)) return;
+    this.pointers.set(e.pointerId, this.localPoint(e));
+
+    if (this.pinch && this.pointers.size >= 2) {
+      this.updatePinch();
+    } else if (this.touch && this.touch.pointerId === e.pointerId) {
+      this.updateTouch(e);
+    }
+  }
+
+  onPointerUp(e, cancelled = false) {
+    if (e.pointerType !== 'touch') {
+      this.onMouseUp(e);
+      return;
+    }
+    this.pointers.delete(e.pointerId);
+
+    if (this.pinch) {
+      // Ending a pinch never places a point; wait for every finger to lift
+      if (this.pointers.size < 2) this.pinch = null;
+      return;
+    }
+    if (this.touch && this.touch.pointerId === e.pointerId) {
+      this.endTouch(e, cancelled);
+    }
+  }
+
+  // ---------- One-finger touch ----------
+
+  startTouch(e) {
+    const state = this.store.getState();
+    const local = this.localPoint(e);
+    const worldPos = screenToWorld(local.x, local.y, state.viewport);
+    const scale = state.viewport.scale;
+
+    if (state.isDrawingPolygon || state.isCalibrating) {
+      // Press shows where the point will land; lifting the finger places it
+      this.touch = { pointerId: e.pointerId, mode: 'place' };
+      this.loupe = local;
+      this.previewPlacement(worldPos);
+      return;
+    }
+
+    const hitIndex = state.polygon.length > 0
+      ? findClosestVertex(worldPos, state.polygon, TOUCH_HIT_RADIUS / scale)
+      : -1;
+    if (hitIndex !== -1) {
+      this.touch = {
+        pointerId: e.pointerId,
+        mode: 'drag-vertex',
+        snapshot: { polygon: [...state.polygon], isPolygonClosed: state.isPolygonClosed },
+        // Keep the vertex under the finger exactly where it was grabbed (no jump)
+        offset: { x: state.polygon[hitIndex].x - worldPos.x, y: state.polygon[hitIndex].y - worldPos.y }
+      };
+      this.loupe = local;
+      this.store.setState(setDraggingVertex(hitIndex));
+      haptic(8);
+      return;
+    }
+
+    this.touch = {
+      pointerId: e.pointerId,
+      mode: 'pan',
+      start: local,
+      viewport: { x: state.viewport.x, y: state.viewport.y }
+    };
+  }
+
+  updateTouch(e) {
+    const state = this.store.getState();
+    const local = this.localPoint(e);
+    const worldPos = screenToWorld(local.x, local.y, state.viewport);
+
+    if (this.touch.mode === 'place') {
+      this.loupe = local;
+      this.previewPlacement(worldPos);
+    } else if (this.touch.mode === 'drag-vertex') {
+      this.loupe = local;
+      const { offset } = this.touch;
+      this.store.setState(updatePolygonVertex(state.draggingVertexIndex, { x: worldPos.x + offset.x, y: worldPos.y + offset.y }));
+    } else if (this.touch.mode === 'pan') {
+      const { start, viewport } = this.touch;
+      this.setViewport({ x: viewport.x + local.x - start.x, y: viewport.y + local.y - start.y });
+    }
+  }
+
+  endTouch(e, cancelled) {
+    const gesture = this.touch;
+    this.touch = null;
+    this.loupe = null;
+    const state = this.store.getState();
+
+    if (gesture.mode === 'place') {
+      if (!cancelled) {
+        const local = this.localPoint(e);
+        const worldPos = screenToWorld(local.x, local.y, state.viewport);
+        this.placePoint(worldPos, TOUCH_SNAP_RADIUS);
+      }
+      this.store.setState(setHoverVertex(null));
+      this.store.setState(setCursorWorldPos(state.isDrawingPolygon || state.isCalibrating ? state.cursorWorldPos : null));
+    } else if (gesture.mode === 'drag-vertex') {
+      this.store.setState(commitDragHistory(gesture.snapshot));
+      this.store.setState(setDraggingVertex(null));
+    } else {
+      this.render(state);
+    }
+  }
+
+  // A second finger turns the gesture into a pinch: undo any half-done drag, place nothing
+  cancelTouchGesture() {
+    const gesture = this.touch;
+    this.touch = null;
+    this.loupe = null;
+    if (!gesture) return;
+    if (gesture.mode === 'drag-vertex') {
+      this.store.setState((prev) => ({
+        ...prev,
+        polygon: Object.freeze([...gesture.snapshot.polygon]),
+        draggingVertexIndex: null,
+        metrics: recalculateMetrics(gesture.snapshot.polygon, gesture.snapshot.isPolygonClosed, prev.rotation, prev.gridAlign)
+      }));
+    } else if (gesture.mode === 'place') {
+      this.store.setState(setHoverVertex(null));
+    }
+  }
+
+  // ---------- Two-finger pinch & pan ----------
+
+  startPinch() {
+    const [a, b] = [...this.pointers.values()];
+    const { viewport } = this.store.getState();
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    this.pinch = {
+      distance: Math.hypot(b.x - a.x, b.y - a.y) || 1,
+      anchorWorld: screenToWorld(mid.x, mid.y, viewport),
+      scale: viewport.scale
+    };
+  }
+
+  updatePinch() {
+    const [a, b] = [...this.pointers.values()];
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const dist = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const scale = Math.min(Math.max(0.1, this.pinch.scale * (dist / this.pinch.distance)), 15);
+    // Keep the world point that started under the fingers' midpoint under it now
+    this.setViewport({
+      scale,
+      x: mid.x - this.pinch.anchorWorld.x * scale,
+      y: mid.y - this.pinch.anchorWorld.y * scale
+    });
+  }
+
+  // ---------- Shared placement helpers ----------
+
+  previewPlacement(worldPos) {
+    const state = this.store.getState();
+    const nearStart = state.isDrawingPolygon && state.polygon.length >= 3
+      && distance(worldPos, state.polygon[0]) * state.viewport.scale <= TOUCH_SNAP_RADIUS;
+    this.store.setState(setHoverVertex(nearStart ? 0 : null));
+    this.store.setState(setCursorWorldPos(worldPos));
+  }
+
+  // Place a polygon vertex (snapping closed near point 0) or a Set Scale point
+  placePoint(worldPos, snapRadiusPx) {
+    const state = this.store.getState();
+    if (state.isCalibrating) {
+      this.store.setState(addCalibrationPoint(worldPos));
+      haptic(10);
+      return;
+    }
+    if (!state.isDrawingPolygon) return;
+    if (state.polygon.length >= 3 && distance(worldPos, state.polygon[0]) * state.viewport.scale <= snapRadiusPx) {
+      this.store.setState(closePolygon());
+      haptic([12, 40, 18]);
+      return;
+    }
+    this.store.setState(addPolygonVertex(worldPos));
+    haptic(10);
+  }
+
+  setViewport(partial) {
+    this.store.setState((prev) => ({ ...prev, viewport: { ...prev.viewport, ...partial } }));
+  }
+
+  // Magnifier above the finger so the exact point under it stays visible
+  drawLoupe(ctx) {
+    if (!this.loupe) return;
+    const { x, y } = this.loupe;
+    const r = LOUPE_RADIUS;
+    const zoom = LOUPE_ZOOM;
+    const cx = x;
+    const cy = y - r - 44 < r + 8 ? y + r + 44 : y - r - 44;
+    const dpr = this.dpr;
+
+    if (!this.loupeCanvas) this.loupeCanvas = document.createElement('canvas');
+    const lc = this.loupeCanvas;
+    const size = Math.round(r * 2 * dpr);
+    if (lc.width !== size) {
+      lc.width = size;
+      lc.height = size;
+    }
+    const lctx = lc.getContext('2d');
+    const srcSize = (r * 2 * dpr) / zoom;
+    lctx.clearRect(0, 0, size, size);
+    lctx.drawImage(this.canvas, x * dpr - srcSize / 2, y * dpr - srcSize / 2, srcSize, srcSize, 0, 0, size, size);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.shadowColor = 'rgba(42, 31, 23, 0.28)';
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetY = 6;
+    ctx.fillStyle = THEME.paper;
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.clip();
+    ctx.drawImage(lc, cx - r, cy - r, r * 2, r * 2);
+    ctx.restore();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = THEME.brass;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.strokeStyle = THEME.saffron;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cx - 10, cy);
+    ctx.lineTo(cx - 3, cy);
+    ctx.moveTo(cx + 3, cy);
+    ctx.lineTo(cx + 10, cy);
+    ctx.moveTo(cx, cy - 10);
+    ctx.lineTo(cx, cy - 3);
+    ctx.moveTo(cx, cy + 3);
+    ctx.lineTo(cx, cy + 10);
+    ctx.stroke();
+    ctx.restore();
   }
 
   getEventWorldPos(e) {
@@ -1048,5 +1374,8 @@ export class CanvasController {
     }
 
     ctx.restore();
+
+    // 11. Touch magnifier (screen space, on top of everything)
+    this.drawLoupe(ctx);
   }
 }
