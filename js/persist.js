@@ -1,5 +1,5 @@
 /**
- * Vastu Mandala Studio — Autosave
+ * Vastu Gyan — Autosave
  * Keeps the current project (boundary, North, scale, layers and the floor plan image)
  * in IndexedDB on this device, so closing the app never loses work.
  */

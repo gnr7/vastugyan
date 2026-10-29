@@ -1,5 +1,5 @@
 /**
- * Vastu Mandala Studio — Application Entry Point & UI Controller
+ * Vastu Gyan — Application Entry Point & UI Controller
  */
 
 import {
@@ -357,7 +357,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btnBarChartPng.addEventListener('click', () => {
       const dateStr = new Date().toISOString().slice(0, 10);
       barChartCanvas.toBlob((blob) => {
-        deliverFile(blob, `VastuMandala-16-Bar-Chart-${dateStr}.png`).then(announceExport);
+        deliverFile(blob, `VastuGyan-16-Bar-Chart-${dateStr}.png`).then(announceExport);
       }, 'image/png');
     });
   }

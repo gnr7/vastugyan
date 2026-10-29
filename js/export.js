@@ -1,5 +1,5 @@
 /**
- * Vastu Mandala Studio — Client-Side Export Engine (PNG & Professional PDF Report)
+ * Vastu Gyan — Client-Side Export Engine (PNG & Professional PDF Report)
  * Generates high-resolution PNG captures and multi-page client-ready PDF reports.
  */
 
@@ -53,7 +53,7 @@ const canvasToBlob = (canvas) => new Promise((resolve) => canvas.toBlob(resolve,
 export const exportCanvasToPng = async (canvas, filename = '') => {
   if (!canvas) return 'cancelled';
   const dateStr = new Date().toISOString().slice(0, 10);
-  const name = filename || `VastuMandala-Plan-${dateStr}.png`;
+  const name = filename || `VastuGyan-Plan-${dateStr}.png`;
   return deliverFile(await canvasToBlob(canvas), name);
 };
 
@@ -77,7 +77,7 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
   });
 
   const dateStr = new Date().toISOString().slice(0, 10);
-  const reportName = filename || `VastuMandala-Report-${dateStr}.pdf`;
+  const reportName = filename || `VastuGyan-Report-${dateStr}.pdf`;
 
   // Client personal details (optional)
   const clientName = (clientInfo.name || '').trim();
@@ -114,7 +114,7 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
   doc.setTextColor(255, 255, 255);
-  doc.text('VASTU MANDALA STUDIO — VASTU PURUSHA MANDALA REPORT', 14, 12);
+  doc.text('VASTU GYAN — VASTU PURUSHA MANDALA REPORT', 14, 12);
 
   // Subheader info (with optional Client Info)
   doc.setFont('helvetica', 'normal');
@@ -215,7 +215,7 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
     const clientSummary = [clientName, clientPhone].filter(Boolean).join(' · ');
     doc.text(`Page 1 of ${totalPages} — Prepared for: ${clientSummary}`, 14, 287);
   } else {
-    doc.text(`Page 1 of ${totalPages} — Vastu Mandala Studio Report`, 14, 287);
+    doc.text(`Page 1 of ${totalPages} — Vastu Gyan Report`, 14, 287);
   }
   doc.text('Open Source · Local-First Vastu Analysis Tool', 135, 287);
 
@@ -389,7 +389,7 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
     const clientSummary = [clientName, clientPhone].filter(Boolean).join(' · ');
     doc.text(`Page 2 of ${totalPages} — Prepared for: ${clientSummary}`, 14, 287);
   } else {
-    doc.text(`Page 2 of ${totalPages} — Vastu Mandala Studio Report`, 14, 287);
+    doc.text(`Page 2 of ${totalPages} — Vastu Gyan Report`, 14, 287);
   }
   doc.text('Open Source · Local-First Vastu Analysis Tool', 135, 287);
 
@@ -485,7 +485,7 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
       const clientSummary = [clientName, clientPhone].filter(Boolean).join(' · ');
       doc.text(`Page 3 of ${totalPages} — Prepared for: ${clientSummary}`, 14, 287);
     } else {
-      doc.text(`Page 3 of ${totalPages} — Vastu Mandala Studio Report`, 14, 287);
+      doc.text(`Page 3 of ${totalPages} — Vastu Gyan Report`, 14, 287);
     }
     doc.text('Open Source · Local-First Vastu Analysis Tool', 135, 287);
   }
@@ -551,7 +551,7 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
       const clientSummary = [clientName, clientPhone].filter(Boolean).join(' · ');
       doc.text(`Page 4 of ${totalPages} — Prepared for: ${clientSummary}`, 14, 287);
     } else {
-      doc.text(`Page 4 of ${totalPages} — Vastu Mandala Studio Report`, 14, 287);
+      doc.text(`Page 4 of ${totalPages} — Vastu Gyan Report`, 14, 287);
     }
     doc.text('Open Source · Local-First Vastu Analysis Tool', 135, 287);
   }

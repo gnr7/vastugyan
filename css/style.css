@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Vastu Mandala Studio — Ivory & Saffron design system
+   Vastu Gyan — Ivory & Saffron design system
    Phone-first: full-screen canvas, bottom dock, draggable sheet.
    Large screens: the same panel becomes a side panel, the dock floats.
    ========================================================================== */
@@ -167,7 +167,6 @@ button:disabled { cursor: default; opacity: 0.38; }
 .brand-mark-core { fill: var(--paper); }
 .brand-text { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
 .brand-name { font-family: var(--font-display); font-size: 20px; letter-spacing: 0.01em; color: var(--ink); }
-.brand-sub { font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brass); }
 
 .topbar-actions { display: flex; align-items: center; gap: 2px; }
 
@@ -570,7 +569,7 @@ button:disabled { cursor: default; opacity: 0.38; }
 .range { width: 100%; accent-color: var(--saffron); height: 32px; }
 .north-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .deg-input { flex: 1; display: flex; align-items: center; gap: 4px; height: 44px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--paper); }
-.deg-input input { width: 100%; border: 0; background: transparent; font-size: 17px; font-weight: 700; outline: none; text-align: center; }
+.deg-input input { width: 100%; height: 100%; border: 0; background: transparent; font-size: 17px; font-weight: 700; outline: none; text-align: center; }
 
 /* Action rows (export, plan) */
 .action-row {
@@ -638,17 +637,19 @@ button:disabled { cursor: default; opacity: 0.38; }
 
 /* Small phones: tighter top bar */
 @media (max-width: 420px) {
-  .brand-sub { display: none; }
   .brand-name { font-size: 18px; }
   .brand-mark { width: 28px; height: 28px; }
   .topbar-actions .icon-btn { width: 40px; height: 40px; }
+  /* All five panel tabs stay in view, so Plan is never hidden off the edge */
+  .panel-tabs { gap: 2px; padding-left: 8px; padding-right: 8px; }
+  .panel-tabs button { flex: 1 0 auto; padding: 0 9px; font-size: 12.5px; }
 }
 
 /* The start screen owns the stage until it's dismissed */
 .stage:has(.onboard[style*="flex"]) :is(.compass, .zoom) { opacity: 0; pointer-events: none; }
 
 /* ---------- Large screens: side panel, floating dock ---------- */
-@media (min-width: 1024px), (min-width: 900px) and (orientation: landscape) {
+@media (min-width: 1024px), (min-width: 900px) and (orientation: landscape), (min-width: 640px) and (orientation: landscape) and (max-height: 540px) {
   .workspace { display: grid; grid-template-columns: minmax(0, 1fr) var(--panel-w); grid-template-rows: minmax(0, 1fr); }
   .stage { position: relative; inset: auto; grid-column: 1; min-height: 0; }
 
@@ -691,6 +692,20 @@ button:disabled { cursor: default; opacity: 0.38; }
   .modal-dialog { max-width: 460px; border-radius: var(--r-xl); padding-bottom: 20px; animation: rise 0.32s var(--spring); }
   .modal-dialog.modal-wide { max-width: 800px; }
   .bar-chart-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* Phones held sideways: the side panel keeps the full height for the plan, so it slims down */
+@media (min-width: 640px) and (orientation: landscape) and (max-height: 540px) {
+  :root { --panel-w: clamp(280px, 40vw, 340px); }
+  .dock { height: 54px; bottom: calc(10px + var(--safe-b)); }
+  .dock-btn { width: 56px; height: 44px; font-size: 10px; gap: 2px; }
+  .dock-btn .icon { width: 20px; height: 20px; }
+  .toast-stack { bottom: 76px; width: min(420px, calc(100% - var(--panel-w) - 32px)); }
+  .onboard { padding-bottom: 72px; }
+  .panel-handle { padding: 10px 16px 8px; }
+  .panel-tabs { gap: 2px; padding: 8px; }
+  .panel-tabs button { flex: 1 0 auto; min-height: 34px; padding: 0 8px; font-size: 12px; }
+  .panel-body { padding: 4px 16px 24px; }
 }
 
 @media (min-width: 600px) and (max-width: 1023px) and (orientation: portrait) {

@@ -1,5 +1,5 @@
 """
-Vastu Mandala Studio — local server for trying the app on a phone or tablet.
+Vastu Gyan — local server for trying the app on a phone or tablet.
 
 Serves only the app's own files (never .git, scratch/ or anything else in this folder)
 to devices on the same Wi-Fi or hotspot, and prints the address to open on the phone.
@@ -87,7 +87,7 @@ class AppOnlyHandler(http.server.SimpleHTTPRequestHandler):
 
 def main():
     server = http.server.ThreadingHTTPServer(("0.0.0.0", PORT), AppOnlyHandler)
-    print("\n  Vastu Mandala Studio is running.\n")
+    print("\n  Vastu Gyan is running.\n")
     print(f"  On this computer:  http://localhost:{PORT}")
     for addr in lan_addresses():
         print(f"  On your phone:     http://{addr}:{PORT}")

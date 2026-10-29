@@ -1,10 +1,10 @@
 /**
- * Vastu Mandala Studio — Service worker
+ * Vastu Gyan — Service worker
  * Network-first for the app's own files (always fresh when online, works offline),
  * cache-first for Google Fonts. Bump CACHE_VERSION when the file list changes.
  */
 
-const CACHE_VERSION = 'vms-v2';
+const CACHE_VERSION = 'vms-v3';
 const FONT_CACHE = 'vms-fonts-v1';
 
 const APP_SHELL = [

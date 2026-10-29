@@ -1,5 +1,5 @@
 /**
- * Vastu Mandala Studio — Pure Functional Geometry Engine
+ * Vastu Gyan — Pure Functional Geometry Engine
  */
 
 // Euclidean distance between two points

@@ -1,5 +1,5 @@
 /**
- * Vastu Mandala Studio — Canvas Viewport & Pure Geometry Rendering Engine
+ * Vastu Gyan — Canvas Viewport & Pure Geometry Rendering Engine
  */
 
 import { distance, findClosestVertex, rayPolygonHit } from './geometry.js';
@@ -929,6 +929,8 @@ export class CanvasController {
 
   handleResize() {
     const rect = this.canvas.parentElement.getBoundingClientRect();
+    const prevWidth = this.width;
+    const prevHeight = this.height;
     this.width = rect.width;
     this.height = rect.height;
 
@@ -937,6 +939,31 @@ export class CanvasController {
 
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.scale(this.dpr, this.dpr);
+
+    // Rotating a phone or tablet, or resizing a window, must not leave the plan off-screen:
+    // refit if the view is still where fitToView put it, otherwise keep the same point centred
+    if (prevWidth > 0 && prevHeight > 0 && (prevWidth !== this.width || prevHeight !== this.height)) {
+      const vp = this.store.getState().viewport;
+      const fitted = this.fittedViewport;
+      if (fitted && vp.scale === fitted.scale && vp.x === fitted.x && vp.y === fitted.y) {
+        this.fitToView();
+        // The bottom sheet may still be sliding into its new place; fit again once it settles
+        clearTimeout(this.refitTimer);
+        this.refitTimer = setTimeout(() => {
+          const now = this.store.getState().viewport;
+          const last = this.fittedViewport;
+          if (last && now.scale === last.scale && now.x === last.x && now.y === last.y) this.fitToView();
+        }, 450);
+        return;
+      }
+      const dx = (this.width - prevWidth) / 2;
+      const dy = (this.height - prevHeight) / 2;
+      this.store.setState((prev) => ({
+        ...prev,
+        viewport: { ...prev.viewport, x: prev.viewport.x + dx, y: prev.viewport.y + dy }
+      }));
+      return;
+    }
 
     this.render(this.store.getState());
   }
@@ -1487,14 +1514,15 @@ export class CanvasController {
     // Keep the plan clear of overlays that sit on top of the canvas (phone dock and sheet)
     const insetBottom = typeof this.getBottomInset === 'function' ? this.getBottomInset() : 0;
     const fit = computeFitViewport(contentW, contentH, this.width, Math.max(120, this.height - insetBottom), 40);
+    const viewport = {
+      scale: fit.scale,
+      x: fit.x - originX * fit.scale,
+      y: fit.y - originY * fit.scale
+    };
+    this.fittedViewport = viewport;
     this.store.setState((prev) => ({
       ...prev,
-      viewport: {
-        ...prev.viewport,
-        scale: fit.scale,
-        x: fit.x - originX * fit.scale,
-        y: fit.y - originY * fit.scale
-      }
+      viewport: { ...prev.viewport, ...viewport }
     }));
   }
 

@@ -1,5 +1,5 @@
 /**
- * Vastu Mandala Studio — Analysis Panel, Elemental Distribution & Area Metrics Engine
+ * Vastu Gyan — Analysis Panel, Elemental Distribution & Area Metrics Engine
  * Pure functional calculations for area proportions, Panch Tatva balance, and entrances.
  */
 

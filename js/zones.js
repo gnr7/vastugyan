@@ -1,5 +1,5 @@
 /**
- * Vastu Mandala Studio — 16 Directional Zones & 32 Entrance Padas Computational Engine
+ * Vastu Gyan — 16 Directional Zones & 32 Entrance Padas Computational Engine
  * Classical 16 Directional Zones (22.5° each) & 32 Perimeter Gateway Padas
  */
 

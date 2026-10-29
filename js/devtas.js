@@ -1,5 +1,5 @@
 /**
- * Vastu Mandala Studio — Classical 45 Devtas Data Dictionary & Spatial Mapping Engine
+ * Vastu Gyan — Classical 45 Devtas Data Dictionary & Spatial Mapping Engine
  * 81 Padas (Paramasayika Mandala) partition according to classical Vastu Shastra
  */
 

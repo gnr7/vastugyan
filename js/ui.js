@@ -1,11 +1,11 @@
 /**
- * Vastu Mandala Studio — App Shell (panel, bottom sheet, dock, compass dial, toasts)
+ * Vastu Gyan — App Shell (panel, bottom sheet, dock, compass dial, toasts)
  * Phones get a draggable bottom sheet; large screens show the same panel at the side.
  */
 
 import { setRotation, commitRotationHistory } from './state.js';
 
-const WIDE_QUERY = '(min-width: 1024px), (min-width: 900px) and (orientation: landscape)';
+const WIDE_QUERY = '(min-width: 1024px), (min-width: 900px) and (orientation: landscape), (min-width: 640px) and (orientation: landscape) and (max-height: 540px)';
 const SHEET_STATES = ['peek', 'half', 'full'];
 const DOCK_PANELS = new Set(['layers', 'analysis', 'export']);
 

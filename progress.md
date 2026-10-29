@@ -210,6 +210,7 @@ Open-source, local-first Vastu Shastra analysis web application inspired by prof
   16. Mobile & tablet app redesign (touch, bottom sheet, compass dial, ivory & saffron, offline install, autosave, share)
   17. Vithi Mandal (4 rings with real-area shares, guidance, canvas overlay, PDF section)
   18. Accuracy fixes: plot-following mandala, Brihat Samhita Marma, 32 gates 81 pad, clipped zones and Five Elements, five bugs
+  19. Renamed to **Vastu Gyan**; responsive fixes (plan refits on rotation/resize, side panel on landscape phones, all panel tabs visible on small screens); WhatsApp/SMS link preview; published on Vercel (only the app files, via `.vercelignore`)
 - All features from the original wish list are built. **Awaiting user review** before anything further.
 
 

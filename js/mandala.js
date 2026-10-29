@@ -1,5 +1,5 @@
 /**
- * Vastu Mandala Studio — Mandala mapping
+ * Vastu Gyan — Mandala mapping
  *
  * Lays the classical 9×9 (81-pada) square onto the traced plot in one of two shapes:
  *

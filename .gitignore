@@ -7,3 +7,7 @@ scratch/page_img_*.png
 scratch/img*_preview.png
 scratch/positive_land_energy_card.png
 scratch/slide6.png
+
+# Vercel project link and the token file it downloads
+.vercel
+.env*

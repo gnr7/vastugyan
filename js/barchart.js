@@ -1,5 +1,5 @@
 /**
- * Vastu Mandala Studio — 16 Direction Bar Chart Renderer
+ * Vastu Gyan — 16 Direction Bar Chart Renderer
  * Draws the area share of each of the 16 zones on a canvas (used by the popup and the PDF).
  */
 
