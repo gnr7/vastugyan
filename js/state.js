@@ -43,8 +43,8 @@ export const createInitialState = () => Object.freeze({
   layers: Object.freeze({
     grid9x9: true,
     brahmasthan: true,
-    devtas45: false,
-    devtaNames: false,
+    devtas45: true,
+    devtaNames: true,
     zones16: false,
     gates32: false,
     gatePadas: false,
@@ -264,6 +264,30 @@ export const setMandalaShape = (shape) => (state) => {
     metrics: recalculateMetrics(state.polygon, state.isPolygonClosed, state.rotation, state.gridAlign, mandalaShape)
   };
 };
+
+// One-tap views: each shows only the layers that belong together, so the plan never piles up
+const LAYERS_OFF = {
+  grid9x9: false, brahmasthan: false, devtas45: false, devtaNames: false, zones16: false,
+  gates32: false, gatePadas: false, marma: false, vithi: false, elements: false, compassWheel: false
+};
+export const VIEWS = {
+  plan: {},
+  mandala: { grid9x9: true, brahmasthan: true, devtas45: true, devtaNames: true },
+  zones: { compassWheel: true, elements: true },
+  entrances: { gates32: true },
+  marma: { grid9x9: true, brahmasthan: true, marma: true }
+};
+
+export const applyView = (name) => (state) => {
+  if (!VIEWS[name]) return state;
+  return { ...state, layers: Object.freeze({ ...LAYERS_OFF, ...VIEWS[name] }) };
+};
+
+// The view the current layers match exactly, or null for a custom mix
+export const currentView = (layers) => Object.keys(VIEWS).find((name) => {
+  const want = { ...LAYERS_OFF, ...VIEWS[name] };
+  return Object.keys(want).every((k) => !!layers[k] === want[k]);
+}) || null;
 
 // Which school's Five Elements mapping to use; it only changes colours and shares, not geometry
 export const setElementStyle = (style) => (state) => {

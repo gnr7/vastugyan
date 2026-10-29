@@ -4,7 +4,7 @@
  * cache-first for Google Fonts. Bump CACHE_VERSION when the file list changes.
  */
 
-const CACHE_VERSION = 'vms-v5';
+const CACHE_VERSION = 'vms-v7';
 const FONT_CACHE = 'vms-fonts-v1';
 
 const APP_SHELL = [

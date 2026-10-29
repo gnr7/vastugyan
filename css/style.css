@@ -73,40 +73,39 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --sand: #16110D;
-    --paper: #211913;
-    --paper-2: #1B150F;
-    --ink: #F2E9DA;
-    --ink-2: #D6C8B3;
-    --muted: #A8977F;
-    --line: #3A2E23;
-    --line-strong: #4D3E30;
-    --saffron: #E08A3C;
-    --saffron-deep: #F0A25A;
-    --saffron-wash: #3A2716;
-    --brass: #D1B062;
-    --brass-wash: #33291A;
-    --kumkum: #E0645A;
-    --kumkum-wash: #3B1D19;
-    --tulsi: #6CC08C;
-    --tulsi-wash: #1C3024;
-    --indigo: #8DB4E8;
-    --indigo-wash: #1B2738;
-    --canvas-bg: #120E0A;
-    --canvas-line: rgba(242, 233, 218, 0.05);
-    --boundary: #E08A3C;
-    --boundary-fill: rgba(224, 138, 60, 0.10);
-    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-2: 0 12px 32px rgba(0, 0, 0, 0.5);
-    --shadow-sheet: 0 -12px 40px rgba(0, 0, 0, 0.55);
-    --vithi-brahma: #E0645A;
-    --vithi-daivika: #D1B062;
-    --vithi-manushya: #6CC08C;
-    --vithi-paishachika: #A8977F;
-    color-scheme: dark;
-  }
+/* Dark theme: only when the person picks it with the toggle (the app always starts light) */
+:root[data-theme="dark"] {
+  --sand: #16110D;
+  --paper: #211913;
+  --paper-2: #1B150F;
+  --ink: #F2E9DA;
+  --ink-2: #D6C8B3;
+  --muted: #A8977F;
+  --line: #3A2E23;
+  --line-strong: #4D3E30;
+  --saffron: #E08A3C;
+  --saffron-deep: #F0A25A;
+  --saffron-wash: #3A2716;
+  --brass: #D1B062;
+  --brass-wash: #33291A;
+  --kumkum: #E0645A;
+  --kumkum-wash: #3B1D19;
+  --tulsi: #6CC08C;
+  --tulsi-wash: #1C3024;
+  --indigo: #8DB4E8;
+  --indigo-wash: #1B2738;
+  --canvas-bg: #120E0A;
+  --canvas-line: rgba(242, 233, 218, 0.05);
+  --boundary: #E08A3C;
+  --boundary-fill: rgba(224, 138, 60, 0.10);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --shadow-sheet: 0 -12px 40px rgba(0, 0, 0, 0.55);
+  --vithi-brahma: #E0645A;
+  --vithi-daivika: #D1B062;
+  --vithi-manushya: #6CC08C;
+  --vithi-paishachika: #A8977F;
+  color-scheme: dark;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -730,6 +729,12 @@ button:disabled { cursor: default; opacity: 0.38; }
 
 /* Mandala shape switch above the layer tiles */
 .switch-row.switch-row-top { margin: 0 0 12px; }
+
+/* One-tap views at the top of Layers */
+.view-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.view-chips button { min-height: 38px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--paper); font-size: 13.5px; font-weight: 600; color: var(--ink-2); }
+.view-chips button[aria-checked="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.view-note { margin: 8px 0 18px; font-size: 12.5px; color: var(--muted); }
 
 /* Five elements style: a two-way choice under the layer tiles */
 .style-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 14px; margin-top: 12px; padding: 14px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--paper-2); }

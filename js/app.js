@@ -20,6 +20,8 @@ import {
   restoreProject,
   setMandalaShape,
   setElementStyle,
+  applyView,
+  currentView,
   setLandDimensions,
   commitRotationHistory
 } from './state.js';
@@ -60,11 +62,30 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentImageBlob = null; // original floor plan file, kept for autosave
   let restoring = false;        // silence step-by-step toasts while a saved project loads
 
-  // Re-read canvas colours when the system switches between light and dark
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  // Light by default; the top bar toggle switches to dark and the choice is remembered
+  const btnTheme = document.getElementById('btnTheme');
+  const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+  const applyTheme = (theme) => {
+    const dark = theme === 'dark';
+    if (dark) document.documentElement.dataset.theme = 'dark';
+    else delete document.documentElement.dataset.theme;
+    if (themeColorMeta) themeColorMeta.content = dark ? '#16110D' : '#F7F1E6';
+    if (btnTheme) {
+      btnTheme.querySelector('use').setAttribute('href', dark ? '#i-sun' : '#i-moon');
+      btnTheme.title = dark ? 'Light mode' : 'Dark mode';
+      btnTheme.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    }
     refreshTheme();
     canvasController.render(store.getState());
-  });
+  };
+  applyTheme(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
+  if (btnTheme) {
+    btnTheme.addEventListener('click', () => {
+      const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+      try { localStorage.setItem('vg-theme', next); } catch (e) { /* private mode: theme just isn't remembered */ }
+      applyTheme(next);
+    });
+  }
 
   // 2. Cache DOM Elements
   const fileInput = document.getElementById('fileInput');
@@ -381,6 +402,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // One-tap views: switch the whole set of layers at once and frame the result
+  const viewButtons = document.querySelectorAll('[data-view]');
+  viewButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      store.setState(applyView(btn.dataset.view));
+      canvasController.fitToView();
+    });
+  });
+
   // Five elements style: Classic (as VastuGrid) or Loose Earth for NE and NW
   const elementStyleButtons = document.querySelectorAll('[data-element-style]');
   elementStyleButtons.forEach((btn) => {
@@ -660,6 +690,8 @@ document.addEventListener('DOMContentLoaded', () => {
     elementStyleButtons.forEach((btn) => {
       btn.setAttribute('aria-checked', String(btn.dataset.elementStyle === state.elementStyle));
     });
+    const view = currentView(state.layers);
+    viewButtons.forEach((btn) => btn.setAttribute('aria-checked', String(btn.dataset.view === view)));
     const elementStyleNote = document.getElementById('elementStyleNote');
     if (elementStyleNote) elementStyleNote.textContent = ELEMENT_STYLES[state.elementStyle].note;
     if (toggleMandalaPlot && toggleMandalaPlot.checked !== (state.mandalaShape !== 'rect')) {

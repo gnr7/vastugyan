@@ -5,8 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Vastu Gyan — Vastu Purusha Mandala & Zonal Analysis</title>
   <meta name="description" content="Trace your floor plan and read it through the Vastu Purusha Mandala: 9×9 grid, 45 Devtas, 16 directional zones and 32 entrances. Works offline on phone, tablet and desktop.">
-  <meta name="theme-color" content="#F7F1E6" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#16110D" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#F7F1E6">
+  <script>
+    // Light unless the person chose dark with the toggle; set before the page paints
+    try { if (localStorage.getItem('vg-theme') === 'dark') document.documentElement.dataset.theme = 'dark'; } catch (e) {}
+  </script>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -54,6 +57,8 @@
       <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/></symbol>
       <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/></symbol>
       <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a6.5 6.5 0 0 0 11 11z"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
     </defs>
   </svg>
 
@@ -77,6 +82,9 @@
         </button>
         <button id="btnRedo" class="icon-btn" title="Redo (Ctrl+Y)" aria-label="Redo" disabled>
           <svg class="icon"><use href="#i-redo"/></svg>
+        </button>
+        <button id="btnTheme" class="icon-btn" title="Dark mode" aria-label="Switch to dark mode">
+          <svg class="icon"><use href="#i-moon"/></svg>
         </button>
         <button class="icon-btn" data-open-panel="plan" title="Floor plan and project" aria-label="Floor plan and project">
           <svg class="icon"><use href="#i-plan"/></svg>
@@ -183,6 +191,15 @@
         <div class="panel-body" id="panelBody">
           <!-- LAYERS -->
           <section class="panel-section" data-panel="layers">
+            <h2 class="section-heading">View</h2>
+            <div class="view-chips" role="radiogroup" aria-label="View">
+              <button type="button" role="radio" data-view="plan" aria-checked="false">Plan</button>
+              <button type="button" role="radio" data-view="mandala" aria-checked="false">Mandala</button>
+              <button type="button" role="radio" data-view="zones" aria-checked="false">Zones</button>
+              <button type="button" role="radio" data-view="entrances" aria-checked="false">Entrances</button>
+              <button type="button" role="radio" data-view="marma" aria-checked="false">Marma</button>
+            </div>
+            <p class="view-note" id="viewNote">Each view shows only the layers that belong together. Mix your own below.</p>
             <h2 class="section-heading">Overlays</h2>
             <label class="switch-row switch-row-top">
               <span class="switch-text">

@@ -18,7 +18,9 @@ import {
 
 // Touch ergonomics: finger-sized hit areas and a magnifier while placing or dragging points
 const TOUCH_HIT_RADIUS = 26;   // px around a vertex that a finger can grab
-const TOUCH_SNAP_RADIUS = 12;  // px from point 0 that closes the boundary on lift (small, so nearby corners can still be placed)
+const TOUCH_SNAP_RADIUS = 12;
+const MAX_ZOOM = 15;          // closest zoom-in
+const MIN_ZOOM_OF_FIT = 0.85; // furthest zoom-out, as a share of the size that fits the screen  // px from point 0 that closes the boundary on lift (small, so nearby corners can still be placed)
 const LOUPE_RADIUS = 56;
 const LOUPE_ZOOM = 2.5;
 
@@ -31,14 +33,93 @@ const haptic = (pattern) => {
   }
 };
 
-// Keeps labels from piling up: a label is drawn only if its box doesn't overlap one already placed
-const createLabelSpace = () => {
-  const boxes = [];
-  return (x, y, w, h) => {
-    const box = { x0: x - w / 2, y0: y - h / 2, x1: x + w / 2, y1: y + h / 2 };
-    if (boxes.some((b) => box.x0 < b.x1 && box.x1 > b.x0 && box.y0 < b.y1 && box.y1 > b.y0)) return false;
-    boxes.push(box);
-    return true;
+// One label board per frame, shared by every layer. Layers hand in their labels with a priority;
+// the board places the most important first and leaves out any that would overlap, so a crowded
+// plan stays readable and the rest appear as you zoom in. Labels are plain text with a soft halo,
+// except the few that earn a pill (element names in the ring, auspicious entrances, North).
+export const LABEL_PRIORITY = {
+  north: 100,
+  element: 90,
+  auspicious: 80,
+  vithi: 70,
+  devtaMajor: 65,
+  entrance: 60,
+  zone: 50,
+  devta: 40,
+  padaCode: 30,
+  centroid: 10
+};
+
+const createLabelBoard = () => {
+  const items = [];
+  return {
+    // item: { text, x, y, px, weight, color, priority, sub, subPx, pill: { fill, text }, angle, alts, force, font }
+    add(item) { items.push(item); },
+    draw(ctx, scale) {
+      const boxes = [];
+      const free = (b) => !boxes.some((o) => b.x0 < o.x1 && b.x1 > o.x0 && b.y0 < o.y1 && b.y1 > o.y0);
+      items.sort((a, b) => b.priority - a.priority).forEach((it) => {
+        const size = it.px / scale;
+        const subSize = it.sub ? (it.subPx || it.px * 0.78) / scale : 0;
+        ctx.font = `${it.weight || 600} ${size}px ${it.font || "'Hanken Grotesk', sans-serif"}`;
+        let w = ctx.measureText(it.text).width;
+        if (it.sub) {
+          ctx.font = `500 ${subSize}px 'Hanken Grotesk', sans-serif`;
+          w = Math.max(w, ctx.measureText(it.sub).width);
+        }
+        const padX = (it.pill ? 6 : 2) / scale;
+        const padY = (it.pill ? 3 : 1) / scale;
+        const bw = w + padX * 2;
+        const bh = size + subSize + padY * 2;
+        const cos = Math.abs(Math.cos(it.angle || 0));
+        const sin = Math.abs(Math.sin(it.angle || 0));
+        const ew = bw * cos + bh * sin;
+        const eh = bw * sin + bh * cos;
+        const spots = [[it.x, it.y], ...(it.alts || [])];
+        let spot = spots.find(([x, y]) => free({ x0: x - ew / 2, y0: y - eh / 2, x1: x + ew / 2, y1: y + eh / 2 }));
+        if (!spot) {
+          if (!it.force) return;
+          spot = spots[0];
+        }
+        const [x, y] = spot;
+        boxes.push({ x0: x - ew / 2, y0: y - eh / 2, x1: x + ew / 2, y1: y + eh / 2 });
+
+        ctx.save();
+        ctx.translate(x, y);
+        if (it.angle) ctx.rotate(it.angle);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const titleY = it.sub ? -subSize / 2 : 0;
+        if (it.pill) {
+          ctx.beginPath();
+          if (typeof ctx.roundRect === 'function') ctx.roundRect(-bw / 2, -bh / 2, bw, bh, bh / 2);
+          else ctx.rect(-bw / 2, -bh / 2, bw, bh);
+          ctx.fillStyle = it.pill.fill;
+          ctx.fill();
+          ctx.font = `${it.weight || 600} ${size}px ${it.font || "'Hanken Grotesk', sans-serif"}`;
+          ctx.fillStyle = it.pill.text;
+          ctx.fillText(it.text, 0, titleY + 0.5 / scale);
+        } else {
+          ctx.lineJoin = 'round';
+          ctx.strokeStyle = THEME.halo;
+          ctx.lineWidth = 3 / scale;
+          ctx.font = `${it.weight || 600} ${size}px ${it.font || "'Hanken Grotesk', sans-serif"}`;
+          ctx.strokeText(it.text, 0, titleY);
+          ctx.fillStyle = it.color || THEME.ink;
+          ctx.fillText(it.text, 0, titleY);
+        }
+        if (it.sub) {
+          ctx.font = `500 ${subSize}px 'Hanken Grotesk', sans-serif`;
+          ctx.lineJoin = 'round';
+          ctx.strokeStyle = THEME.halo;
+          ctx.lineWidth = 3 / scale;
+          ctx.strokeText(it.sub, 0, size / 2 + 0.5 / scale);
+          ctx.fillStyle = THEME.muted;
+          ctx.fillText(it.sub, 0, size / 2 + 0.5 / scale);
+        }
+        ctx.restore();
+      });
+    }
   };
 };
 
@@ -58,7 +139,9 @@ export const THEME = {
   kumkum: '#B3261E',
   canvasLine: 'rgba(42, 31, 23, 0.06)',
   boundary: '#C2681C',
-  boundaryFill: 'rgba(194, 104, 28, 0.08)'
+  boundaryFill: 'rgba(194, 104, 28, 0.08)',
+  halo: 'rgba(255, 252, 246, 0.92)',
+  muted: '#7A6A58'
 };
 
 export const refreshTheme = () => {
@@ -73,6 +156,8 @@ export const refreshTheme = () => {
   THEME.canvasLine = read('--canvas-line', THEME.canvasLine);
   THEME.boundary = read('--boundary', THEME.boundary);
   THEME.boundaryFill = read('--boundary-fill', THEME.boundaryFill);
+  THEME.halo = read('--paper', THEME.paper);
+  THEME.muted = read('--muted', THEME.muted);
 };
 
 // Pure coordinate transformation functions
@@ -268,7 +353,7 @@ export const drawPolygon = (ctx, state) => {
 };
 
 // Render Centroid Marker (Red Center of Mass Dot)
-export const drawCentroidMarker = (ctx, centroid, scale) => {
+export const drawCentroidMarker = (ctx, centroid, scale, board = null) => {
   if (!centroid) return;
 
   const r = 5.5 / scale;
@@ -297,15 +382,11 @@ export const drawCentroidMarker = (ctx, centroid, scale) => {
   ctx.fillStyle = '#ffffff';
   ctx.fill();
 
-  // Small label badge below centroid
-  const fontSize = Math.max(9, Math.min(11, 10 / Math.sqrt(scale)));
-  ctx.font = `600 ${fontSize}px 'Hanken Grotesk', sans-serif`;
-  ctx.fillStyle = THEME.kumkum;
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('Centroid', centroid.x + outerR + 3 / scale, centroid.y + outerR);
-
   ctx.restore();
+
+  if (board) {
+    board.add({ text: 'Centroid', x: centroid.x + outerR + 26 / scale, y: centroid.y + outerR, px: 10, color: THEME.kumkum, priority: LABEL_PRIORITY.centroid });
+  }
 };
 
 // Render 9x9 Vastu Purusha Mandala Grid and Brahmasthan
@@ -318,7 +399,7 @@ const VITHI_STYLE = {
 };
 
 // Render the Vithi Mandal: four concentric rings with a name on each ring's top band
-export const drawVithiMandal = (ctx, vithi, scale, layers) => {
+export const drawVithiMandal = (ctx, vithi, scale, layers, board = null, withFill = true) => {
   if (!vithi || !layers.vithi) return;
   const angleRad = ((vithi.angleDeg || 0) * Math.PI) / 180;
   const tracePath = (corners) => {
@@ -330,11 +411,13 @@ export const drawVithiMandal = (ctx, vithi, scale, layers) => {
   ctx.save();
   vithi.rings.forEach((ring) => {
     const style = VITHI_STYLE[ring.id];
-    ctx.beginPath();
-    tracePath(ring.outerCorners);
-    if (ring.innerCorners) tracePath(ring.innerCorners);
-    ctx.fillStyle = style.fill;
-    ctx.fill('evenodd');
+    if (withFill) {
+      ctx.beginPath();
+      tracePath(ring.outerCorners);
+      if (ring.innerCorners) tracePath(ring.innerCorners);
+      ctx.fillStyle = style.fill;
+      ctx.fill('evenodd');
+    }
     ctx.beginPath();
     tracePath(ring.outerCorners);
     ctx.strokeStyle = style.stroke;
@@ -342,36 +425,17 @@ export const drawVithiMandal = (ctx, vithi, scale, layers) => {
     ctx.setLineDash([]);
     ctx.stroke();
   });
-
-  const fontPx = Math.max(10, Math.min(13, 12 / Math.sqrt(scale)));
-  vithi.rings.forEach((ring) => {
-    const style = VITHI_STYLE[ring.id];
-    ctx.save();
-    ctx.translate(ring.labelPoint.x, ring.labelPoint.y);
-    ctx.rotate(angleRad);
-    ctx.scale(1 / scale, 1 / scale);
-    ctx.font = `600 ${fontPx}px 'Hanken Grotesk', sans-serif`;
-    const text = style.label;
-    const w = ctx.measureText(text).width + 12;
-    const h = fontPx + 6;
-    ctx.beginPath();
-    if (typeof ctx.roundRect === 'function') ctx.roundRect(-w / 2, -h / 2, w, h, h / 2);
-    else ctx.rect(-w / 2, -h / 2, w, h);
-    ctx.fillStyle = 'rgba(255, 252, 246, 0.94)';
-    ctx.fill();
-    ctx.strokeStyle = style.stroke;
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.fillStyle = '#2A1F17';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, 0, 0.5);
-    ctx.restore();
-  });
   ctx.restore();
+
+  if (board) {
+    vithi.rings.forEach((ring) => {
+      const style = VITHI_STYLE[ring.id];
+      board.add({ text: style.label, x: ring.labelPoint.x, y: ring.labelPoint.y, px: 11.5, color: style.stroke, angle: angleRad, priority: LABEL_PRIORITY.vithi });
+    });
+  }
 };
 
-export const draw9x9Grid = (ctx, grid9x9, scale, layers) => {
+export const draw9x9Grid = (ctx, grid9x9, scale, layers, withFill = true) => {
   if (!grid9x9 || !grid9x9.padas || grid9x9.padas.length === 0) return;
   const showGrid = layers.grid9x9;
   const showBrahmasthan = layers.brahmasthan;
@@ -397,8 +461,10 @@ export const draw9x9Grid = (ctx, grid9x9, scale, layers) => {
   if (showBrahmasthan) {
     ctx.beginPath();
     tracePolygon(ctx, grid9x9.brahmasthanOutline || grid9x9.brahmasthanBox);
-    ctx.fillStyle = 'rgba(179, 38, 30, 0.12)';
-    ctx.fill();
+    if (withFill) {
+      ctx.fillStyle = 'rgba(179, 38, 30, 0.12)';
+      ctx.fill();
+    }
     ctx.strokeStyle = THEME.kumkum;
     ctx.lineWidth = 2.2 / scale;
     ctx.setLineDash([]);
@@ -408,7 +474,7 @@ export const draw9x9Grid = (ctx, grid9x9, scale, layers) => {
 };
 
 // Render 45 Devtas Overlay (Classical Paramasayika Mandala)
-export const draw45Devtas = (ctx, devtaFields, scale, layers, angleDeg = 0) => {
+export const draw45Devtas = (ctx, devtaFields, scale, layers, angleDeg = 0, board = null, withFill = true) => {
   if (!devtaFields || devtaFields.length === 0) return;
 
   const showBoundaries = layers.devtas45;
@@ -436,35 +502,45 @@ export const draw45Devtas = (ctx, devtaFields, scale, layers, angleDeg = 0) => {
       // Category-tailored styles (Google UI palette)
       if (devta.category === 'central') {
         // Brahma
-        ctx.fillStyle = 'rgba(217, 48, 37, 0.08)';
-        ctx.fill();
+        if (withFill) {
+          ctx.fillStyle = 'rgba(217, 48, 37, 0.08)';
+          ctx.fill();
+        }
         ctx.strokeStyle = '#d93025';
         ctx.lineWidth = 2.2 / scale;
         ctx.stroke();
       } else if (devta.category === 'inner_cardinal') {
         // Aryama, Vivaswan, Mitra, Bhudhar
-        ctx.fillStyle = 'rgba(26, 115, 232, 0.07)';
-        ctx.fill();
+        if (withFill) {
+          ctx.fillStyle = 'rgba(26, 115, 232, 0.07)';
+          ctx.fill();
+        }
         ctx.strokeStyle = '#1a73e8';
         ctx.lineWidth = 1.8 / scale;
         ctx.stroke();
       } else if (devta.category === 'inner_diagonal') {
         // 8 Diagonal Devtas
-        ctx.fillStyle = 'rgba(30, 142, 62, 0.06)';
-        ctx.fill();
+        if (withFill) {
+          ctx.fillStyle = 'rgba(30, 142, 62, 0.06)';
+          ctx.fill();
+        }
         ctx.strokeStyle = '#1e8e3e';
         ctx.lineWidth = 1.5 / scale;
         ctx.stroke();
       } else {
         // Outer 32 perimeter devtas
         if (devta.isAuspiciousEntrance) {
-          ctx.fillStyle = 'rgba(52, 168, 83, 0.12)';
-          ctx.fill();
+          if (withFill) {
+            ctx.fillStyle = 'rgba(52, 168, 83, 0.12)';
+            ctx.fill();
+          }
           ctx.strokeStyle = '#34a853';
           ctx.lineWidth = 1.4 / scale;
         } else {
-          ctx.fillStyle = 'rgba(241, 243, 244, 0.15)';
-          ctx.fill();
+          if (withFill) {
+            ctx.fillStyle = 'rgba(241, 243, 244, 0.15)';
+            ctx.fill();
+          }
           ctx.strokeStyle = 'rgba(95, 99, 104, 0.55)';
           ctx.lineWidth = 1.0 / scale;
         }
@@ -475,120 +551,47 @@ export const draw45Devtas = (ctx, devtaFields, scale, layers, angleDeg = 0) => {
     ctx.restore();
   }
 
-  // 2. Render Devta Labels and Pada Numbers (when Devta Names is active)
-  if (showNames) {
-    ctx.save();
-
+  // 2. Devta names go on the shared board: the big ones first, the rest where they fit.
+  // The pada number joins the name once a pada is large enough on screen.
+  if (showNames && board) {
     devtaFields.forEach((devta) => {
       if (!devta.center) return;
-
-      const padW = devta.padWidth || 50;
-      const padH = devta.padHeight || 50;
-      const cellDim = Math.min(padW, padH);
-
-      // Compute responsive font sizes in world units, clamped to legible screen pixel limits
-      const isLargeDevta = devta.category === 'central' || devta.category === 'inner_cardinal';
-      const baseRatio = isLargeDevta ? 0.22 : 0.16;
-
-      const rawTitlePx = cellDim * baseRatio * scale;
-      const clampedTitlePx = Math.max(9, Math.min(15, rawTitlePx));
-      const titleFontSize = clampedTitlePx / scale;
-
-      const clampedSubPx = Math.max(7.5, Math.min(11, clampedTitlePx * 0.75));
-      const subFontSize = clampedSubPx / scale;
-
-      // Position and rotate in local Devta space
-      ctx.save();
-      ctx.translate(devta.center.x, devta.center.y);
-      ctx.rotate(angleRad);
-
-      const titleText = devta.name;
-      const subText = devta.entranceCode
-        ? `#${devta.number} (${devta.entranceCode})`
-        : `#${devta.number}`;
-
-      // Measure text for background pill halo
-      ctx.font = `600 ${titleFontSize}px 'Hanken Grotesk', sans-serif`;
-      const titleWidth = ctx.measureText(titleText).width;
-
-      ctx.font = `400 ${subFontSize}px 'Hanken Grotesk', sans-serif`;
-      const subWidth = ctx.measureText(subText).width;
-
-      const maxWidth = Math.max(titleWidth, subWidth);
-      const pillPadX = 4 / scale;
-      const pillPadY = 2 / scale;
-      const pillW = maxWidth + pillPadX * 2;
-      const pillH = titleFontSize + subFontSize + pillPadY * 2.5;
-
-      // Draw background pill for high contrast against drawing / grid
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
-      ctx.fillRect(-pillW / 2, -pillH / 2, pillW, pillH);
-
-      ctx.strokeStyle = devta.isAuspiciousEntrance
-        ? 'rgba(52, 168, 83, 0.6)'
-        : (devta.category === 'central' ? 'rgba(217, 48, 37, 0.5)' : 'rgba(0, 0, 0, 0.12)');
-      ctx.lineWidth = 1 / scale;
-      ctx.strokeRect(-pillW / 2, -pillH / 2, pillW, pillH);
-
-      // Render Title (Devta Name)
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.font = `600 ${titleFontSize}px 'Hanken Grotesk', sans-serif`;
-      ctx.fillStyle = devta.category === 'central'
-        ? '#d93025'
-        : (devta.isAuspiciousEntrance ? '#137333' : '#202124');
-      ctx.fillText(titleText, 0, -subFontSize / 2);
-
-      // Render Subtitle (Number / Entrance Code)
-      ctx.font = `500 ${subFontSize}px 'Hanken Grotesk', sans-serif`;
-      ctx.fillStyle = devta.isAuspiciousEntrance ? '#188038' : '#5f6368';
-      ctx.fillText(subText, 0, titleFontSize / 2 + 1 / scale);
-
-      ctx.restore();
+      const cellPx = Math.min(devta.padWidth || 50, devta.padHeight || 50) * scale;
+      const major = devta.category === 'central' || devta.category === 'inner_cardinal';
+      const px = Math.max(9, Math.min(major ? 15 : 13, cellPx * (major ? 0.22 : 0.17)));
+      board.add({
+        text: devta.name,
+        sub: cellPx > 70 ? `#${devta.number}` : null,
+        x: devta.center.x,
+        y: devta.center.y,
+        px,
+        angle: angleRad,
+        color: devta.category === 'central' ? THEME.kumkum : (devta.isAuspiciousEntrance ? '#2F7A4B' : THEME.ink),
+        priority: major ? LABEL_PRIORITY.devtaMajor : LABEL_PRIORITY.devta
+      });
     });
-
-    ctx.restore();
   }
 };
 
 // Render 16 Directional Zones (22.5° rays, sector fills, directional badges)
 const ELEMENT_STYLE = {
-  Water: { color: '#2C6FB7', fill: 'rgba(44, 111, 183, 0.22)', label: 'Water area' },
-  Air: { color: '#3E8E5E', fill: 'rgba(62, 142, 94, 0.22)', label: 'Air area' },
-  Fire: { color: '#C2412B', fill: 'rgba(194, 65, 43, 0.20)', label: 'Fire area' },
-  Earth: { color: '#B8862B', fill: 'rgba(184, 134, 43, 0.24)', label: 'Earth area' },
-  Space: { color: '#7D7590', fill: 'rgba(125, 117, 144, 0.22)', label: 'Space area' },
+  Water: { color: '#2C6FB7', fill: 'rgba(44, 111, 183, 0.22)', label: 'Water' },
+  Air: { color: '#3E8E5E', fill: 'rgba(62, 142, 94, 0.22)', label: 'Air' },
+  Fire: { color: '#C2412B', fill: 'rgba(194, 65, 43, 0.20)', label: 'Fire' },
+  Earth: { color: '#B8862B', fill: 'rgba(184, 134, 43, 0.24)', label: 'Earth' },
+  Space: { color: '#7D7590', fill: 'rgba(125, 117, 144, 0.22)', label: 'Space' },
   HardEarth: { color: '#A87A12', fill: 'rgba(222, 178, 40, 0.30)', label: 'Hard earth' },
   LooseEarth: { color: '#97804A', fill: 'rgba(238, 220, 160, 0.42)', label: 'Loose earth' }
 };
 
-const drawPill = (ctx, text, x, y, fontWorld, scale, color, place) => {
-  ctx.font = `600 ${fontWorld}px 'Hanken Grotesk', sans-serif`;
-  const w = ctx.measureText(text).width + 8 / scale;
-  const h = fontWorld + 4 / scale;
-  if (place && !place(x, y, w, h)) return false;
-  ctx.fillStyle = 'rgba(255, 252, 246, 0.94)';
-  ctx.fillRect(x - w / 2, y - h / 2, w, h);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1 / scale;
-  ctx.strokeRect(x - w / 2, y - h / 2, w, h);
-  ctx.fillStyle = color;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text, x, y);
-  return true;
-};
-
 // Render the 16 directional zones and/or the Five Elements view.
 // With a closed plot both are clipped to it: rays end on the walls and labels sit inside.
-export const draw16Zones = (ctx, zones16, scale, layers, plot = null, style = 'classic') => {
+export const draw16Zones = (ctx, zones16, scale, layers, plot = null, style = 'classic', board = null, withFill = true) => {
   if (!zones16 || !zones16.zones || zones16.zones.length === 0) return;
   if (!layers.zones16 && !layers.elements) return;
   const { centroid, radius, zones } = zones16;
   const closed = plot && plot.length >= 3;
   const reach = closed ? 4 * Math.max(...plot.map((p) => distance(p, centroid))) + 1 : radius;
-  const fontWorld = Math.max(9, Math.min(13, 11 / Math.sqrt(scale))) / scale;
-  const place = createLabelSpace();
   const hitDistance = (rad) => {
     if (!closed) return radius;
     const hit = rayPolygonHit(plot, centroid, { x: Math.cos(rad), y: Math.sin(rad) });
@@ -609,14 +612,14 @@ export const draw16Zones = (ctx, zones16, scale, layers, plot = null, style = 'c
     ctx.clip();
   }
 
-  // Fills: one per element in the Five Elements view, a light tint per zone otherwise
+  // Fills: one per element in the Five Elements view, a light tint per zone when the zones own the colour
   if (layers.elements) {
     zones.forEach((z) => {
       wedge(z.startRad, z.endRad);
       ctx.fillStyle = ELEMENT_STYLE[toneOf(z)].fill;
       ctx.fill();
     });
-  } else {
+  } else if (withFill) {
     zones.forEach((z) => {
       wedge(z.startRad, z.endRad);
       ctx.fillStyle = z.bgTint;
@@ -649,9 +652,9 @@ export const draw16Zones = (ctx, zones16, scale, layers, plot = null, style = 'c
     ctx.restore();
   }
 
-  // Labels inside the plot. Element names go first so they always find room: when their
-  // spot is taken they slide along their own direction rather than disappear.
-  ctx.save();
+  // Labels go on the shared board. Element names always show, sliding along their own direction
+  // when their spot is taken; zone names are left to the ring when the compass wheel is on.
+  if (!board) return;
   if (layers.elements) {
     const groups = [];
     zones.forEach((z) => {
@@ -668,17 +671,16 @@ export const draw16Zones = (ctx, zones16, scale, layers, plot = null, style = 'c
       const wall = hitDistance(rad);
       const look = ELEMENT_STYLE[g.tone];
       const spot = (f) => [centroid.x + Math.cos(rad) * wall * f, centroid.y + Math.sin(rad) * wall * f];
-      const placed = [0.5, 0.36, 0.64, 0.24, 0.76].some((f) => drawPill(ctx, look.label, ...spot(f), fontWorld * 1.1, scale, look.color, place));
-      if (!placed) drawPill(ctx, look.label, ...spot(0.5), fontWorld * 1.1, scale, look.color, null);
+      const [x, y] = spot(0.5);
+      board.add({ text: look.label, x, y, alts: [0.36, 0.64, 0.24, 0.76].map(spot), px: 12.5, weight: 700, color: look.color, priority: LABEL_PRIORITY.element, force: true });
     });
   }
-  if (layers.zones16) {
+  if (layers.zones16 && !layers.compassWheel) {
     zones.forEach((z) => {
       const d = hitDistance(z.centerRad) * (closed ? 0.78 : 0.92);
-      drawPill(ctx, z.short, centroid.x + Math.cos(z.centerRad) * d, centroid.y + Math.sin(z.centerRad) * d, fontWorld, scale, z.color, place);
+      board.add({ text: z.short, x: centroid.x + Math.cos(z.centerRad) * d, y: centroid.y + Math.sin(z.centerRad) * d, px: 11, color: z.color, priority: LABEL_PRIORITY.zone });
     });
   }
-  ctx.restore();
 };
 
 // Compass wheel: a ring just outside the plot, as practitioners draw it on paper, so the plan
@@ -699,7 +701,7 @@ const WHEEL_STYLE = {
   Space: { fill: '#A7A1B3', text: '#FFFFFF' }
 };
 
-export const drawCompassWheel = (ctx, zones16, scale, plot, style = 'classic', rotationDeg = 0) => {
+export const drawCompassWheel = (ctx, zones16, scale, plot, style = 'classic', rotationDeg = 0, board = null) => {
   if (!zones16 || !zones16.zones || zones16.zones.length !== 16 || !plot || plot.length < 3) return;
   const { centroid, zones } = zones16;
   const { inner, outer } = compassWheelRadii(plot, centroid);
@@ -759,66 +761,37 @@ export const drawCompassWheel = (ctx, zones16, scale, plot, style = 'classic', r
     ctx.restore();
   });
 
-  // North line through the centre, with the angle it makes with the top of the plan
+  // North: a pointer on the inside of the ring and the angle beside it, so nothing crosses the plan
   const north = zones.find((z) => z.id === 'N');
   if (north) {
     const nRad = north.centerRad;
-    const tail = at(nRad + Math.PI, inner);
-    const head = at(nRad, inner); // stops at the ring so the N label stays readable
+    const tip = at(nRad, inner);
+    const size = (outer - inner) * 0.42;
+    const back = at(nRad, inner - size);
+    const side = { x: -Math.sin(nRad) * size * 0.55, y: Math.cos(nRad) * size * 0.55 };
     ctx.beginPath();
-    ctx.moveTo(tail.x, tail.y);
-    ctx.lineTo(head.x, head.y);
-    ctx.strokeStyle = THEME.kumkum;
-    ctx.lineWidth = 2.2 / scale;
-    ctx.stroke();
-
-    const up = -Math.PI / 2;
-    let turn = nRad - up;
-    while (turn > Math.PI) turn -= Math.PI * 2;
-    while (turn <= -Math.PI) turn += Math.PI * 2;
-    const deg = Math.round((((rotationDeg % 360) + 360) % 360) * 10) / 10;
-    if (Math.abs(turn) > 0.004) {
-      const r = inner * 0.9;
-      const top = at(up, r * 0.82);
-      const topEnd = at(up, inner);
-      ctx.beginPath();
-      ctx.moveTo(top.x, top.y);
-      ctx.lineTo(topEnd.x, topEnd.y);
-      ctx.setLineDash([4 / scale, 3 / scale]);
-      ctx.lineWidth = 1.2 / scale;
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.beginPath();
-      ctx.arc(centroid.x, centroid.y, r, up, nRad, turn < 0);
-      ctx.lineWidth = 1.6 / scale;
-      ctx.stroke();
+    ctx.moveTo(tip.x, tip.y);
+    ctx.lineTo(back.x + side.x, back.y + side.y);
+    ctx.lineTo(back.x - side.x, back.y - side.y);
+    ctx.closePath();
+    ctx.fillStyle = THEME.kumkum;
+    ctx.fill();
+    if (board) {
+      const deg = Math.round((((rotationDeg % 360) + 360) % 360) * 10) / 10;
+      const label = at(nRad, inner - size * 2.4);
+      board.add({ text: `N ${deg}°`, x: label.x, y: label.y, px: 11.5, weight: 700, pill: { fill: THEME.kumkum, text: '#FFFFFF' }, priority: LABEL_PRIORITY.north, force: true });
     }
-    const labelAt = at(up + turn / 2, inner * (Math.abs(turn) > 0.004 ? 0.8 : 0.9));
-    const pillFont = Math.max(10, Math.min(14, 12 / Math.sqrt(scale))) / scale;
-    drawPill(ctx, `N ${deg}°`, labelAt.x, labelAt.y, pillFont, scale, THEME.kumkum, null);
   }
 
   ctx.restore();
 };
 
 // Render 32 Perimeter Entrance Gates (N1-N8, E1-E8, S1-S8, W1-W8) & Auspicious Highlights
-export const draw32EntranceGates = (ctx, entranceGates32, scale, layers, angleDeg = 0) => {
+export const draw32EntranceGates = (ctx, entranceGates32, scale, layers, angleDeg = 0, board = null) => {
   if (!entranceGates32 || entranceGates32.length === 0) return;
   if (!layers.gates32) return;
 
-  const angleRad = (angleDeg * Math.PI) / 180;
-
   ctx.save();
-
-  // Helper for clean rounded badge (Google UI minimal 2-3px radius)
-  const drawPill = (x, y, w, h, r) => {
-    ctx.beginPath();
-    if (typeof ctx.roundRect === 'function') {
-      ctx.roundRect(x, y, w, h, r);
-    } else {
-      ctx.rect(x, y, w, h);
-    }
-  };
 
   // Trace a gate's stretch of the real plot boundary
   // A gate can own several stretches of wall (e.g. both arms of a U-shaped plan)
@@ -870,78 +843,28 @@ export const draw32EntranceGates = (ctx, entranceGates32, scale, layers, angleDe
     });
   });
 
-  // 2. Draw Entrance Gate Badges just outside the polygon boundary
-  const fontSizePx = Math.max(9, Math.min(13, 11 / Math.sqrt(scale)));
-  const fontSizeWorld = fontSizePx / scale;
-  const offsetDist = 16 / scale;
+  ctx.restore();
 
-  const placeGate = createLabelSpace();
+  // 2. Codes just outside the walls, on the shared board
+  if (!board) return;
+  const offsetDist = 15 / scale;
   entranceGates32.forEach((gate) => {
     if (!gate.edgeMidpoint) return;
-
     const normal = gate.normal || { x: 0, y: -1 };
-    const labelX = gate.edgeMidpoint.x + normal.x * offsetDist;
-    const labelY = gate.edgeMidpoint.y + normal.y * offsetDist;
-
-    ctx.save();
-    ctx.translate(labelX, labelY);
-    ctx.rotate(angleRad);
-
-    const badgeText = gate.isAuspicious ? `★ ${gate.code}` : gate.code;
-
-    ctx.font = `600 ${fontSizeWorld}px 'Hanken Grotesk', sans-serif`;
-    const textW = ctx.measureText(badgeText).width;
-    const padX = 5 / scale;
-    const padY = 2.5 / scale;
-    const pillW = textW + padX * 2;
-    const pillH = fontSizeWorld + padY * 2;
-    const pillR = 3 / scale;
-    if (!placeGate(labelX, labelY, pillW, pillH)) {
-      ctx.restore();
-      return;
-    }
-
+    const x = gate.edgeMidpoint.x + normal.x * offsetDist;
+    const y = gate.edgeMidpoint.y + normal.y * offsetDist;
     if (gate.isAuspicious) {
-      // Bold green badge for auspicious entrances
-      drawPill(-pillW / 2, -pillH / 2, pillW, pillH, pillR);
-      ctx.fillStyle = '#1e8e3e';
-      ctx.fill();
-
-      ctx.strokeStyle = '#137333';
-      ctx.lineWidth = 1 / scale;
-      ctx.stroke();
-
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(badgeText, 0, 0);
+      board.add({ text: gate.code, x, y, px: 11, weight: 700, pill: { fill: '#2F7A4B', text: '#FFFFFF' }, priority: LABEL_PRIORITY.auspicious });
     } else {
-      // Clean neutral white/gray badge for regular entrances
-      drawPill(-pillW / 2, -pillH / 2, pillW, pillH, pillR);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-      ctx.fill();
-
-      ctx.strokeStyle = '#dadce0';
-      ctx.lineWidth = 1 / scale;
-      ctx.stroke();
-
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#3c4043';
-      ctx.fillText(badgeText, 0, 0);
+      board.add({ text: gate.code, x, y, px: 10.5, color: THEME.muted, priority: LABEL_PRIORITY.entrance });
     }
-
-    ctx.restore();
   });
-
-  ctx.restore();
 };
 
 // Render the 32 outer padas of the mandala with their entrance codes ("32 gates 81 pad")
-export const drawGatePadas = (ctx, devtaFields, scale, layers, auspicious) => {
+export const drawGatePadas = (ctx, devtaFields, scale, layers, auspicious, board = null) => {
   if (!devtaFields || !layers.gatePadas) return;
   const outer = devtaFields.filter((d) => d.entranceCode);
-  const fontWorld = Math.max(9, Math.min(13, 11 / Math.sqrt(scale))) / scale;
   ctx.save();
   outer.forEach((d) => {
     ctx.beginPath();
@@ -950,16 +873,16 @@ export const drawGatePadas = (ctx, devtaFields, scale, layers, auspicious) => {
       ctx.fillStyle = 'rgba(47, 122, 75, 0.16)';
       ctx.fill();
     }
-    ctx.strokeStyle = 'rgba(42, 31, 23, 0.85)';
-    ctx.lineWidth = 1.6 / scale;
+    ctx.strokeStyle = 'rgba(42, 31, 23, 0.45)';
+    ctx.lineWidth = 1.2 / scale;
     ctx.stroke();
   });
-  const place = createLabelSpace();
+  ctx.restore();
+  if (!board || layers.gates32) return;
   outer.forEach((d) => {
     const good = auspicious && auspicious.has(d.entranceCode);
-    drawPill(ctx, d.entranceCode, d.center.x, d.center.y, fontWorld, scale, good ? '#2F7A4B' : '#2A1F17', place);
+    board.add({ text: d.entranceCode, x: d.center.x, y: d.center.y, px: 10.5, weight: good ? 700 : 600, color: good ? '#2F7A4B' : THEME.ink, priority: good ? LABEL_PRIORITY.auspicious : LABEL_PRIORITY.padaCode });
   });
-  ctx.restore();
 };
 
 // Render Marma Sthan (Classical Diagonal Energy Lines & 9 Sensitive Nodes)
@@ -1268,6 +1191,19 @@ export class CanvasController {
       this.store.setState(commitDragHistory(gesture.snapshot));
       this.store.setState(setDraggingVertex(null));
     } else {
+      // Two quick taps on empty space bring the whole plan back into view
+      const local = this.localPoint(e);
+      const moved = Math.hypot(local.x - gesture.start.x, local.y - gesture.start.y);
+      const now = Date.now();
+      const last = this.lastTap;
+      if (!cancelled && moved < 10) {
+        if (last && now - last.time < 320 && Math.hypot(local.x - last.x, local.y - last.y) < 40) {
+          this.lastTap = null;
+          this.fitToView();
+          return;
+        }
+        this.lastTap = { time: now, x: local.x, y: local.y };
+      }
       this.render(state);
     }
   }
@@ -1307,13 +1243,13 @@ export class CanvasController {
     const [a, b] = [...this.pointers.values()];
     const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     const dist = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-    const scale = Math.min(Math.max(0.1, this.pinch.scale * (dist / this.pinch.distance)), 15);
+    const scale = this.pinch.scale * (dist / this.pinch.distance);
     // Keep the world point that started under the fingers' midpoint under it now
     this.setViewport({
       scale,
       x: mid.x - this.pinch.anchorWorld.x * scale,
       y: mid.y - this.pinch.anchorWorld.y * scale
-    });
+    }, { zooming: true });
   }
 
   // ---------- Shared placement helpers ----------
@@ -1344,8 +1280,11 @@ export class CanvasController {
     haptic(10);
   }
 
-  setViewport(partial) {
-    this.store.setState((prev) => ({ ...prev, viewport: { ...prev.viewport, ...partial } }));
+  setViewport(partial, options = {}) {
+    this.store.setState((prev) => ({
+      ...prev,
+      viewport: this.constrainViewport({ ...prev.viewport, ...partial }, prev, options)
+    }));
   }
 
   // Magnifier above the finger so the exact point under it stays visible
@@ -1500,17 +1439,7 @@ export class CanvasController {
 
     // 2. Handle canvas panning
     if (state.viewport.isDragging) {
-      const nextX = e.clientX - state.viewport.dragStartX;
-      const nextY = e.clientY - state.viewport.dragStartY;
-
-      this.store.setState((prev) => ({
-        ...prev,
-        viewport: {
-          ...prev.viewport,
-          x: nextX,
-          y: nextY
-        }
-      }));
+      this.setViewport({ x: e.clientX - state.viewport.dragStartX, y: e.clientY - state.viewport.dragStartY });
       return;
     }
 
@@ -1582,7 +1511,10 @@ export class CanvasController {
     const state = this.store.getState();
     if (state.isDrawingPolygon && state.polygon.length >= 3) {
       this.store.setState(closePolygon());
+      return;
     }
+    // Double-click on the plan brings the whole of it back into view
+    if (!state.isDrawingPolygon && !state.isCalibrating) this.fitToView();
   }
 
   onWheel(e) {
@@ -1594,74 +1526,105 @@ export class CanvasController {
 
     const zoomFactor = e.deltaY < 0 ? 1.12 : 0.89;
     const currentScale = state.viewport.scale;
-    const newScale = Math.min(Math.max(0.1, currentScale * zoomFactor), 15);
+    const newScale = currentScale * zoomFactor;
 
-    if (newScale === currentScale) return;
-
-    // Zoom anchored at cursor position
-    const newX = mouseX - (mouseX - state.viewport.x) * (newScale / currentScale);
-    const newY = mouseY - (mouseY - state.viewport.y) * (newScale / currentScale);
-
-    this.store.setState((prev) => ({
-      ...prev,
-      viewport: {
-        ...prev.viewport,
-        x: newX,
-        y: newY,
-        scale: newScale
-      }
-    }));
+    // Zoom anchored at the cursor (the bounds keep the plan in view)
+    this.setViewport({
+      scale: newScale,
+      x: mouseX - (mouseX - state.viewport.x) * (newScale / currentScale),
+      y: mouseY - (mouseY - state.viewport.y) * (newScale / currentScale)
+    }, { zooming: true });
   }
 
+  // The + and - buttons zoom around the middle of what you can see, not of the whole canvas
   zoomBy(factor) {
     const state = this.store.getState();
-    const centerX = this.width / 2;
-    const centerY = this.height / 2;
+    const area = this.visibleArea();
+    const centerX = area.width / 2;
+    const centerY = area.height / 2;
     const currentScale = state.viewport.scale;
-    const newScale = Math.min(Math.max(0.1, currentScale * factor), 15);
+    const newScale = currentScale * factor;
+    this.setViewport({
+      scale: newScale,
+      x: centerX - (centerX - state.viewport.x) * (newScale / currentScale),
+      y: centerY - (centerY - state.viewport.y) * (newScale / currentScale)
+    }, { zooming: true });
+  }
 
-    const newX = centerX - (centerX - state.viewport.x) * (newScale / currentScale);
-    const newY = centerY - (centerY - state.viewport.y) * (newScale / currentScale);
+  // ---------- Keeping the plan in view ----------
 
-    this.store.setState((prev) => ({
-      ...prev,
-      viewport: {
-        ...prev.viewport,
-        x: newX,
-        y: newY,
-        scale: newScale
+  // What has to fit on screen: the floor plan image and the plot (and the compass wheel when shown)
+  contentBox(state) {
+    const b = state.metrics.bounds;
+    let box = { originX: 0, originY: 0, contentW: 800, contentH: 600 };
+    if (state.image && b) {
+      const originX = Math.min(0, b.minX);
+      const originY = Math.min(0, b.minY);
+      box = { originX, originY, contentW: Math.max(state.image.width, b.maxX) - originX, contentH: Math.max(state.image.height, b.maxY) - originY };
+    } else if (state.image) {
+      box = { originX: 0, originY: 0, contentW: state.image.width, contentH: state.image.height };
+    } else if (b) {
+      // A hand-drawn plot can sit anywhere in world space, not just from (0, 0)
+      box = { originX: b.minX, originY: b.minY, contentW: b.width || 800, contentH: b.height || 600 };
+    }
+    return withWheelRoom(state, box);
+  }
+
+  // The part of the canvas you can actually see (the phone sheet and dock cover the bottom)
+  visibleArea() {
+    const insetBottom = typeof this.getBottomInset === 'function' ? this.getBottomInset() : 0;
+    return { width: this.width, height: Math.max(120, this.height - insetBottom) };
+  }
+
+  fitViewport(state) {
+    const box = this.contentBox(state);
+    const area = this.visibleArea();
+    const fit = computeFitViewport(box.contentW, box.contentH, area.width, area.height, 40);
+    return { scale: fit.scale, x: fit.x - box.originX * fit.scale, y: fit.y - box.originY * fit.scale };
+  }
+
+  // Zooming out stops a little below the fitted size and glides the plan back to the middle as it
+  // gets there; panning and zooming in can never push the plan off the visible area.
+  constrainViewport(next, state, { zooming = false } = {}) {
+    if (!this.width || !this.height) return next;
+    // Tracing on a blank canvas may reach anywhere; there is nothing yet to keep in view
+    if (state.isDrawingPolygon && !state.image) return next;
+    const fit = this.fitViewport(state);
+    const box = this.contentBox(state);
+    const area = this.visibleArea();
+    const scale = Math.min(Math.max(fit.scale * MIN_ZOOM_OF_FIT, next.scale), MAX_ZOOM);
+    const centred = {
+      x: (area.width - box.contentW * scale) / 2 - box.originX * scale,
+      y: (area.height - box.contentH * scale) / 2 - box.originY * scale
+    };
+    let { x, y } = next;
+    if (scale !== next.scale) {
+      x = centred.x;
+      y = centred.y;
+    } else if (zooming && scale < state.viewport.scale) {
+      const glideFrom = fit.scale * 1.5;
+      if (scale < glideFrom) {
+        const t = Math.min(1, (glideFrom - scale) / (glideFrom - fit.scale));
+        x += (centred.x - x) * t;
+        y += (centred.y - y) * t;
       }
-    }));
+    }
+    // Keep at least a third of the plan (or of the screen, if the plan is bigger) in sight
+    const left = x + box.originX * scale;
+    const top = y + box.originY * scale;
+    const right = left + box.contentW * scale;
+    const bottom = top + box.contentH * scale;
+    const keepX = Math.min(box.contentW * scale, area.width) * 0.35;
+    const keepY = Math.min(box.contentH * scale, area.height) * 0.35;
+    if (right < keepX) x += keepX - right;
+    if (left > area.width - keepX) x -= left - (area.width - keepX);
+    if (bottom < keepY) y += keepY - bottom;
+    if (top > area.height - keepY) y -= top - (area.height - keepY);
+    return { ...next, scale, x, y };
   }
 
   fitToView() {
-    const state = this.store.getState();
-    let contentW = 800;
-    let contentH = 600;
-    let originX = 0;
-    let originY = 0;
-
-    if (state.image) {
-      contentW = state.image.width;
-      contentH = state.image.height;
-    } else if (state.metrics.bounds) {
-      // A hand-drawn plot can sit anywhere in world space, not just from (0, 0)
-      contentW = state.metrics.bounds.width || 800;
-      contentH = state.metrics.bounds.height || 600;
-      originX = state.metrics.bounds.minX;
-      originY = state.metrics.bounds.minY;
-    }
-
-    ({ originX, originY, contentW, contentH } = withWheelRoom(state, { originX, originY, contentW, contentH }));
-
-    // Keep the plan clear of overlays that sit on top of the canvas (phone dock and sheet)
-    const insetBottom = typeof this.getBottomInset === 'function' ? this.getBottomInset() : 0;
-    const fit = computeFitViewport(contentW, contentH, this.width, Math.max(120, this.height - insetBottom), 40);
-    const viewport = {
-      scale: fit.scale,
-      x: fit.x - originX * fit.scale,
-      y: fit.y - originY * fit.scale
-    };
+    const viewport = this.fitViewport(this.store.getState());
     this.fittedViewport = viewport;
     this.store.setState((prev) => ({
       ...prev,
@@ -1735,54 +1698,62 @@ export class CanvasController {
       drawFloorPlanImage(ctx, state.image);
     }
 
-    // 5. Render 16 Directional Zones Overlay (Sector fills, 22.5° rays, zone labels)
+    // One label board for every layer, and one layer that colours the plan; the others draw outlines
+    const board = createLabelBoard();
+    const scale = state.viewport.scale;
+    const L = state.layers;
+    const fillOwner = L.elements ? 'elements' : L.vithi ? 'vithi' : L.devtas45 ? 'devtas' : L.zones16 ? 'zones' : null;
+    const plot = state.isPolygonClosed ? state.polygon : null;
+
+    // 5. 16 zones and the Five Elements view
     if (state.metrics.zones16) {
-      draw16Zones(ctx, state.metrics.zones16, state.viewport.scale, state.layers, state.isPolygonClosed ? state.polygon : null, state.elementStyle);
+      draw16Zones(ctx, state.metrics.zones16, scale, L, plot, state.elementStyle, board, fillOwner === 'zones');
     }
 
     // 5b. Vithi Mandal rings (under the grid lines)
     if (state.metrics.vithi) {
-      drawVithiMandal(ctx, state.metrics.vithi, state.viewport.scale, state.layers);
+      drawVithiMandal(ctx, state.metrics.vithi, scale, L, board, fillOwner === 'vithi');
     }
 
-    // 6. Render 9x9 Vastu grid & Brahmasthan overlay
+    // 6. 9x9 grid and Brahmasthan (its tint only when nothing else colours the plan)
     if (state.metrics.grid9x9) {
-      draw9x9Grid(ctx, state.metrics.grid9x9, state.viewport.scale, state.layers);
+      draw9x9Grid(ctx, state.metrics.grid9x9, scale, L, fillOwner === null || fillOwner === 'devtas');
     }
 
-    // 7. Render 45 Devtas Overlay & Labels
+    // 7. 45 Devtas and the 32 outer padas
     if (state.metrics.devtaFields) {
-      draw45Devtas(ctx, state.metrics.devtaFields, state.viewport.scale, state.layers, state.metrics.gridAngle);
-      drawGatePadas(ctx, state.metrics.devtaFields, state.viewport.scale, state.layers, AUSPICIOUS_ENTRANCES);
+      draw45Devtas(ctx, state.metrics.devtaFields, scale, L, state.metrics.gridAngle, board, fillOwner === 'devtas');
+      drawGatePadas(ctx, state.metrics.devtaFields, scale, L, AUSPICIOUS_ENTRANCES, board);
     }
 
-    // 8. Render 32 Perimeter Entrance Gates & Auspicious Highlights
+    // 8. 32 entrances along the walls
     if (state.metrics.entranceGates32) {
-      draw32EntranceGates(ctx, state.metrics.entranceGates32, state.viewport.scale, state.layers, state.rotation);
+      draw32EntranceGates(ctx, state.metrics.entranceGates32, scale, L, state.rotation, board);
     }
 
-    // 9. Render Marma Sthan (Diagonal Energy Lines & Intersection Nodes)
+    // 9. Marma lines and nodes
     if (state.metrics.marmaSthan) {
-      drawMarmaSthan(ctx, state.metrics.marmaSthan, state.viewport.scale, state.layers);
+      drawMarmaSthan(ctx, state.metrics.marmaSthan, scale, L);
     }
 
-    // 9b. Compass wheel around the plot, with the North line
-    if (state.layers.compassWheel && state.isPolygonClosed && state.metrics.zones16) {
-      drawCompassWheel(ctx, state.metrics.zones16, state.viewport.scale, state.polygon, state.elementStyle, state.rotation);
+    // 9b. Compass wheel around the plot
+    if (L.compassWheel && plot && state.metrics.zones16) {
+      drawCompassWheel(ctx, state.metrics.zones16, scale, plot, state.elementStyle, state.rotation, board);
     }
 
-    // 10. Render property boundary polygon & vertex handles
+    // 10. Boundary, corner handles and the centre
     drawPolygon(ctx, state);
     drawCalibration(ctx, state);
-
-    // 10. Render geometric centroid marker
     if (state.metrics.centroid) {
-      drawCentroidMarker(ctx, state.metrics.centroid, state.viewport.scale);
+      drawCentroidMarker(ctx, state.metrics.centroid, scale, board);
     }
+
+    // 11. Every label, most important first
+    board.draw(ctx, scale);
 
     ctx.restore();
 
-    // 11. Touch magnifier (screen space, on top of everything)
+    // 12. Touch magnifier (screen space, on top of everything)
     this.drawLoupe(ctx);
   }
 }
