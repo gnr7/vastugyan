@@ -312,6 +312,64 @@ const convexHull = (points) => {
   return lower.slice(0, -1).concat(upper.slice(0, -1));
 };
 
+// Minimum-area rectangle around the polygon: the plot's own walls, independent of North.
+// Returns { angleDeg (0–90), length, breadth } with length ≥ breadth, in world units.
+export const calculatePlotDimensions = (points) => {
+  if (!points || points.length < 3) return null;
+  const hull = convexHull(points);
+  let best = null;
+  for (let i = 0; i < hull.length; i++) {
+    const a = hull[i];
+    const b = hull[(i + 1) % hull.length];
+    const edgeAngle = Math.atan2(b.y - a.y, b.x - a.x);
+    const cos = Math.cos(-edgeAngle);
+    const sin = Math.sin(-edgeAngle);
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const p of hull) {
+      const x = p.x * cos - p.y * sin;
+      const y = p.x * sin + p.y * cos;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    const w = maxX - minX;
+    const h = maxY - minY;
+    if (!best || w * h < best.w * best.h - 1e-9) best = { w, h, edgeAngle };
+  }
+  const deg = (best.edgeAngle * 180) / Math.PI;
+  return {
+    angleDeg: ((deg % 90) + 90) % 90,
+    length: Math.max(best.w, best.h),
+    breadth: Math.min(best.w, best.h)
+  };
+};
+
+// Every pair of non-adjacent edges that cross: a boundary traced with corners out of order
+export const findSelfIntersections = (points) => {
+  const n = points.length;
+  if (n < 4) return [];
+  const orient = (p, q, r) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+  const crossings = [];
+  for (let i = 0; i < n; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % n];
+    for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue; // first and last edges share a corner
+      const c = points[j];
+      const d = points[(j + 1) % n];
+      const d1 = orient(a, b, c);
+      const d2 = orient(a, b, d);
+      const d3 = orient(c, d, a);
+      const d4 = orient(c, d, b);
+      if (((d1 > 1e-9 && d2 < -1e-9) || (d1 < -1e-9 && d2 > 1e-9)) && ((d3 > 1e-9 && d4 < -1e-9) || (d3 < -1e-9 && d4 > 1e-9))) {
+        crossings.push([i, j]);
+      }
+    }
+  }
+  return crossings;
+};
+
 // Orientation of the plot's walls: angle (0–90°) of the minimum-area rectangle around the polygon
 export const calculatePlotOrientation = (points) => {
   if (!points || points.length < 3) return 0;
@@ -386,20 +444,30 @@ const gridSquare = (grid9x9, [lo, hi]) => [
 
 /**
  * Vithi Mandal: the four concentric rings of the 9×9 grid, with the real plot area in each.
- * A ring's area is the plot clipped to its outer square minus the plot clipped to its inner one.
- * @param {Object} grid9x9 - Result of generate9x9VastuGrid
+ * On the classical rectangle a ring's area is the plot clipped to its outer square minus its inner
+ * square. On the plot-following mandala the rings are copies of the plot itself, so each ring's
+ * outline encloses plot area directly.
+ * @param {Object} grid9x9 - Grid from buildMandalaGrid (or generate9x9VastuGrid)
  * @param {Array} points - Closed plot polygon in world coordinates
  */
 export const calculateVithiMandal = (grid9x9, points) => {
   if (!grid9x9 || !grid9x9.outerBox || !points || points.length < 3) return null;
   const plotArea = calculatePolygonArea(points);
-  const areaInside = (square) => calculatePolygonArea(clipPolygonByConvex(points, square));
+  const follow = grid9x9.shape === 'plot' && typeof grid9x9.outlineOf === 'function';
+  const squareOf = ([lo, hi]) => (grid9x9.ringOutline ? grid9x9.ringOutline(lo, hi) : gridSquare(grid9x9, [lo, hi]));
+  // Plot-following rings are scaled copies of the plot: scale s holds exactly s² of its area
+  const exact = follow;
+  const areaInside = (square, [lo, hi]) => {
+    if (exact) return plotArea * ((hi - lo) / 9) ** 2;
+    return follow ? calculatePolygonArea(square) : calculatePolygonArea(clipPolygonByConvex(points, square));
+  };
+  const pointAt = (u, v) => (grid9x9.mapPoint ? grid9x9.mapPoint(u, v) : gridPointToWorld(grid9x9, u, v));
 
   const rings = VITHI_RINGS.map((ring) => {
-    const outer = gridSquare(grid9x9, ring.outer);
-    const inner = ring.inner ? gridSquare(grid9x9, ring.inner) : null;
-    const area = Math.max(0, areaInside(outer) - (inner ? areaInside(inner) : 0));
-    const ringGridArea = calculatePolygonArea(outer) - (inner ? calculatePolygonArea(inner) : 0);
+    const outer = squareOf(ring.outer);
+    const inner = ring.inner ? squareOf(ring.inner) : null;
+    const area = Math.max(0, areaInside(outer, ring.outer) - (inner ? areaInside(inner, ring.inner) : 0));
+    const ringGridArea = exact ? area : calculatePolygonArea(outer) - (inner ? calculatePolygonArea(inner) : 0);
     return {
       ...ring,
       outerCorners: outer,
@@ -407,11 +475,11 @@ export const calculateVithiMandal = (grid9x9, points) => {
       area,
       areaPct: plotArea > 0 ? (area / plotArea) * 100 : 0,
       // How much of the ring the plot actually fills (below 100% where the plot has cuts)
-      fillPct: ringGridArea > 0 ? (area / ringGridArea) * 100 : 0,
+      fillPct: ringGridArea > 0 ? Math.min(100, (area / ringGridArea) * 100) : 0,
       // Label anchor: middle of the ring's top band (the Brahma label sits in its centre)
       labelPoint: ring.inner
-        ? gridPointToWorld(grid9x9, 4.5, (ring.outer[0] + ring.inner[0]) / 2)
-        : gridPointToWorld(grid9x9, 4.5, ring.outer[0] + 0.45)
+        ? pointAt(4.5, (ring.outer[0] + ring.inner[0]) / 2)
+        : pointAt(4.5, ring.outer[0] + 0.45)
     };
   });
 
@@ -435,79 +503,3 @@ export const findClosestVertex = (worldPoint, vertices, toleranceWorld) => {
 
   return closestIndex;
 };
-
-// Calculate classical Marma Sthan: diagonal energy lines and 9 intersection nodes
-export const calculateMarmaSthan = (points, centroid, angleDeg = 0) => {
-  if (!points || points.length < 3 || !centroid) return null;
-
-  const angleRad = (angleDeg * Math.PI) / 180;
-  const rotatedPoints = points.map((p) => rotatePoint(p, centroid, -angleRad));
-
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-
-  for (const p of rotatedPoints) {
-    if (p.x < minX) minX = p.x;
-    if (p.y < minY) minY = p.y;
-    if (p.x > maxX) maxX = p.x;
-    if (p.y > maxY) maxY = p.y;
-  }
-
-  const width = maxX - minX;
-  const height = maxY - minY;
-  if (width <= 0 || height <= 0) return null;
-
-  const padW = width / 9;
-  const padH = height / 9;
-  const toWorld = (rx, ry) => rotatePoint({ x: rx, y: ry }, centroid, angleRad);
-
-  // 6 Primary Energy Lines (Mahamarma & Upamarma Sutras)
-  const lineDefinitions = [
-    // 2 Main Diagonal Karna Sutras (Corner to Corner)
-    { startCol: 0, startRow: 0, endCol: 9, endRow: 9, type: 'mahamarma' },
-    { startCol: 9, startRow: 0, endCol: 0, endRow: 9, type: 'mahamarma' },
-    // 4 Upamarma Diagonal Lines
-    { startCol: 3, startRow: 0, endCol: 9, endRow: 6, type: 'upamarma' },
-    { startCol: 0, startRow: 3, endCol: 6, endRow: 9, type: 'upamarma' },
-    { startCol: 6, startRow: 0, endCol: 0, endRow: 6, type: 'upamarma' },
-    { startCol: 9, startRow: 3, endCol: 3, endRow: 9, type: 'upamarma' }
-  ];
-
-  const lines = lineDefinitions.map((def) => ({
-    start: toWorld(minX + def.startCol * padW, minY + def.startRow * padH),
-    end: toWorld(minX + def.endCol * padW, minY + def.endRow * padH),
-    type: def.type
-  }));
-
-  // 9 Sensitive Marma Intersection Nodes
-  const marmaPoints = [
-    // Center Nabhi Marma
-    { col: 4.5, row: 4.5, name: 'Brahma Nabhi (Center)' },
-    // 4 Corners of Brahmasthan
-    { col: 3, row: 3, name: 'Brahmasthan NW' },
-    { col: 6, row: 3, name: 'Brahmasthan NE' },
-    { col: 6, row: 6, name: 'Brahmasthan SE' },
-    { col: 3, row: 6, name: 'Brahmasthan SW' },
-    // 4 Outer Diamond Intersections
-    { col: 4.5, row: 1.5, name: 'North Upamarma' },
-    { col: 7.5, row: 4.5, name: 'East Upamarma' },
-    { col: 4.5, row: 7.5, name: 'South Upamarma' },
-    { col: 1.5, row: 4.5, name: 'West Upamarma' }
-  ].map((node) => ({
-    ...node,
-    x: toWorld(minX + node.col * padW, minY + node.row * padH).x,
-    y: toWorld(minX + node.col * padW, minY + node.row * padH).y
-  }));
-
-  return {
-    lines,
-    marmaPoints,
-    width,
-    height
-  };
-};
-
-
-

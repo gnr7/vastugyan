@@ -231,8 +231,8 @@ test('ring areas add up to the plot area (L-shape, any rotation, both grid modes
     }
   }
 });
-test('L-shape cut shows up as a partly filled outer ring', () => {
-  const rings = recalculateMetrics(lShape, true, 0).vithi.rings;
+test('rectangle mandala: L-shape cut shows up as a partly filled outer ring', () => {
+  const rings = recalculateMetrics(lShape, true, 0, 'north', 'rect').vithi.rings;
   const outer = rings.find((r) => r.id === 'paishachika');
   assert.ok(outer.fillPct < 100 && outer.fillPct > 50, `fill ${outer.fillPct}`);
 });

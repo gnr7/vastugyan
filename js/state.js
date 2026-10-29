@@ -3,12 +3,14 @@ import {
   calculatePolygonCentroid,
   calculateBoundingBox,
   generate9x9VastuGrid,
-  calculateMarmaSthan,
   calculateVithiMandal,
   calculatePlotOrientation,
+  calculatePlotDimensions,
+  findSelfIntersections,
   nearestWallAlignedAngle,
   distance
 } from './geometry.js';
+import { buildMandalaGrid, calculateMandalaMarma } from './mandala.js';
 import { computeDevtaSpatialFields } from './devtas.js';
 import { calculate16DirectionalZones, calculateZoneAreas, calculate32EntranceGates } from './zones.js';
 
@@ -32,6 +34,8 @@ export const createInitialState = () => Object.freeze({
   cursorWorldPos: null,       // current mouse position in world coordinates
   rotation: 0,                // 0 - 360 degrees
   gridAlign: 'north',         // 'north': 9x9 grid turns with North · 'walls': grid stays on the plot's walls
+  mandalaShape: 'plot',       // 'plot': rings follow the plot outline (as VastuGrid) · 'rect': classical rectangle
+  landDims: null,             // { length, breadth } in feet typed by the user, or null to measure from the walls
   calibration: null,          // { realPerWorld, unit: 'ft' | 'm', realLength } once Set Scale is applied
   isCalibrating: false,
   calibrationPoints: Object.freeze([]), // up to 2 world points of the reference wall
@@ -42,6 +46,7 @@ export const createInitialState = () => Object.freeze({
     devtaNames: false,
     zones16: false,
     gates32: false,
+    gatePadas: false,
     marma: false,
     vithi: false,
     elements: false
@@ -56,6 +61,10 @@ export const createInitialState = () => Object.freeze({
     entranceGates32: null,    // 32 Perimeter Entrance Gates
     marmaSthan: null,         // Marma Sthan diagonal lines and nodes
     vithi: null,              // Vithi Mandal: 4 concentric rings with real plot area
+    plotDims: null,           // { length, breadth, angleDeg } of the plot's own walls (minimum rectangle)
+    brahmasthan: null,        // { outline, area, pctOfPlot } — the real Brahmasthan on this plot
+    boundaryError: null,      // 'self-intersecting' when the traced boundary crosses itself
+    crossings: null,          // [[edgeIndex, edgeIndex], ...] for a crossing boundary
     gridAngle: 0              // angle the 9x9 grid is laid at (North rotation or wall-aligned)
   }),
   history: Object.freeze({
@@ -118,7 +127,7 @@ export const setRotation = (deg) => (state) => {
   return {
     ...state,
     rotation: normalizedDeg,
-    metrics: recalculateMetrics(state.polygon, state.isPolygonClosed, normalizedDeg, state.gridAlign)
+    metrics: recalculateMetrics(state.polygon, state.isPolygonClosed, normalizedDeg, state.gridAlign, state.mandalaShape)
   };
 };
 
@@ -130,56 +139,137 @@ export const toggleLayer = (layerName, isVisible) => (state) => ({
   })
 });
 
+const pointInPolygon = (poly, p) => {
+  let c = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i];
+    const b = poly[j];
+    if ((a.y > p.y) !== (b.y > p.y) && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) c = !c;
+  }
+  return c;
+};
+
+// A point a short step off a wall, on the side that is inside the plot
+const insideOfWall = (m, path, poly, stepLen) => {
+  let best = null;
+  for (let i = 1; i < (path || []).length; i++) {
+    const a = path[i - 1];
+    const b = path[i];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    if (len < 1e-9) continue;
+    const t = Math.max(0, Math.min(1, ((m.x - a.x) * (b.x - a.x) + (m.y - a.y) * (b.y - a.y)) / (len * len)));
+    const d = Math.hypot(a.x + (b.x - a.x) * t - m.x, a.y + (b.y - a.y) * t - m.y);
+    if (!best || d < best.d) best = { d, nx: -(b.y - a.y) / len, ny: (b.x - a.x) / len };
+  }
+  if (!best) return m;
+  for (const sign of [1, -1]) {
+    const p = { x: m.x + best.nx * stepLen * sign, y: m.y + best.ny * stepLen * sign };
+    if (pointInPolygon(poly, p)) return p;
+  }
+  return m;
+};
+
+const EMPTY_METRICS = {
+  area: 0,
+  centroid: null,
+  bounds: null,
+  grid9x9: null,
+  devtaFields: null,
+  zones16: null,
+  entranceGates32: null,
+  marmaSthan: null,
+  vithi: null,
+  plotDims: null,
+  brahmasthan: null,
+  boundaryError: null,
+  crossings: null
+};
+
 // Pure calculation of metrics, 9x9 grid, Devtas, and 16 Zones from polygon and rotation
-export const recalculateMetrics = (points, isClosed, rotation = 0, gridAlign = 'north') => {
+export const recalculateMetrics = (points, isClosed, rotation = 0, gridAlign = 'north', mandalaShape = 'plot') => {
   if (!points || points.length === 0) {
-    return Object.freeze({
-      area: 0,
-      centroid: null,
-      bounds: null,
-      grid9x9: null,
-      devtaFields: null,
-      zones16: null,
-      entranceGates32: null,
-      marmaSthan: null,
-      vithi: null,
-      gridAngle: rotation
-    });
+    return Object.freeze({ ...EMPTY_METRICS, gridAngle: rotation });
+  }
+
+  const centroid = calculatePolygonCentroid(points);
+  const bounds = calculateBoundingBox(points);
+
+  // A boundary that crosses itself has no meaningful area: report it instead of wrong numbers
+  const crossings = isClosed && points.length >= 4 ? findSelfIntersections(points) : [];
+  if (crossings.length > 0) {
+    return Object.freeze({ ...EMPTY_METRICS, centroid, bounds, gridAngle: rotation, boundaryError: 'self-intersecting', crossings });
   }
 
   const hasPlot = isClosed && points.length >= 3;
   const area = isClosed ? calculatePolygonArea(points) : 0;
-  const centroid = calculatePolygonCentroid(points);
-  const bounds = calculateBoundingBox(points);
 
   // The grid follows North, or the plot's walls (turned to the side facing nearest North)
   const gridAngle = (hasPlot && gridAlign === 'walls')
     ? nearestWallAlignedAngle(calculatePlotOrientation(points), rotation)
     : rotation;
 
-  const grid9x9 = (hasPlot && centroid) ? generate9x9VastuGrid(points, centroid, gridAngle) : null;
-  const devtaFields = grid9x9 ? computeDevtaSpatialFields(grid9x9) : null;
+  const grid9x9 = (hasPlot && centroid) ? buildMandalaGrid(points, centroid, gridAngle, mandalaShape) : null;
+  const devtaFields = grid9x9 ? computeDevtaSpatialFields(grid9x9, rotation) : null;
   const zonesBase = centroid ? calculate16DirectionalZones(centroid, bounds, rotation, grid9x9) : null;
   const zones16 = (hasPlot && zonesBase) ? calculateZoneAreas(zonesBase, points) : zonesBase;
   const entranceGates32 = (hasPlot && centroid)
     ? calculate32EntranceGates(points, centroid, rotation, devtaFields)
     : null;
-  const marmaSthan = (hasPlot && centroid) ? calculateMarmaSthan(points, centroid, gridAngle) : null;
+  // Outer Devtas are labelled on their entrance's own stretch of wall, just inside it (8/9 of the
+  // way out), so the label stays on the building even where a slice straddles a cut in the plot
+  const step = 0.025 * Math.hypot(bounds.width, bounds.height);
+  const devtaFieldsPlaced = devtaFields && entranceGates32 && grid9x9.shape === 'plot'
+    ? devtaFields.map((d) => {
+      const gate = d.entranceCode && entranceGates32.find((g) => g.code === d.entranceCode);
+      return gate && gate.edgeMidpoint ? { ...d, center: insideOfWall(gate.edgeMidpoint, gate.path, points, step) } : d;
+    })
+    : devtaFields;
+  const marmaSthan = grid9x9 ? calculateMandalaMarma(grid9x9) : null;
   const vithi = grid9x9 ? calculateVithiMandal(grid9x9, points) : null;
+  const plotDims = hasPlot ? calculatePlotDimensions(points) : null;
+
+  // The Brahmasthan as it falls on this plot: its share of the real plot area
+  let brahmasthan = null;
+  if (grid9x9 && vithi && area > 0) {
+    const ring = vithi.rings.find((r) => r.id === 'brahma');
+    brahmasthan = { outline: grid9x9.brahmasthanOutline, area: ring.area, pctOfPlot: (ring.area / area) * 100 };
+  }
 
   return Object.freeze({
     area,
     centroid,
     bounds,
     grid9x9,
-    devtaFields,
+    devtaFields: devtaFieldsPlaced,
     zones16,
     entranceGates32,
     marmaSthan,
     vithi,
+    plotDims,
+    brahmasthan,
+    boundaryError: null,
+    crossings: null,
     gridAngle
   });
 };
+
+export const setMandalaShape = (shape) => (state) => {
+  const mandalaShape = shape === 'rect' ? 'rect' : 'plot';
+  if (mandalaShape === state.mandalaShape) return state;
+  return {
+    ...state,
+    mandalaShape,
+    metrics: recalculateMetrics(state.polygon, state.isPolygonClosed, state.rotation, state.gridAlign, mandalaShape)
+  };
+};
+
+// Plot length and breadth typed by the user (feet) for Land Energy, or null to measure from the walls
+export const setLandDimensions = (dims) => (state) => ({
+  ...state,
+  landDims: dims && dims.length > 0 && dims.breadth > 0
+    ? Object.freeze({ length: Math.max(dims.length, dims.breadth), breadth: Math.min(dims.length, dims.breadth) })
+    : null
+});
 
 export const setGridAlign = (mode) => (state) => {
   const gridAlign = mode === 'walls' ? 'walls' : 'north';
@@ -187,7 +277,7 @@ export const setGridAlign = (mode) => (state) => {
   return {
     ...state,
     gridAlign,
-    metrics: recalculateMetrics(state.polygon, state.isPolygonClosed, state.rotation, gridAlign)
+    metrics: recalculateMetrics(state.polygon, state.isPolygonClosed, state.rotation, gridAlign, state.mandalaShape)
   };
 };
 
@@ -214,6 +304,7 @@ export const applyCalibration = (realLength, unit) => (state) => {
   if (!(worldLength > 0) || !(realLength > 0)) return state;
   return {
     ...state,
+    history: pushHistory(state),
     calibration: Object.freeze({
       realPerWorld: realLength / worldLength,
       unit: unit === 'm' ? 'm' : 'ft',
@@ -233,8 +324,38 @@ export const setDrawingMode = (isDrawing) => (state) => ({
 
 const MAX_HISTORY = 40;
 
+// One undo step: the boundary, North and the scale
+const snapshotOf = (state) => ({
+  polygon: state.polygon,
+  isPolygonClosed: state.isPolygonClosed,
+  rotation: state.rotation,
+  calibration: state.calibration
+});
+const pushHistory = (state, snapshot = snapshotOf(state)) => Object.freeze({
+  past: Object.freeze([...(state.history?.past || []), snapshot].slice(-MAX_HISTORY)),
+  future: Object.freeze([])
+});
+// Restore a snapshot (older snapshots may lack rotation/scale: keep the current ones then)
+const restoreFrom = (state, snap) => {
+  const rotation = typeof snap.rotation === 'number' ? snap.rotation : state.rotation;
+  const calibration = 'calibration' in snap ? snap.calibration : state.calibration;
+  return {
+    polygon: Object.freeze([...snap.polygon]),
+    isPolygonClosed: snap.isPolygonClosed,
+    rotation,
+    calibration,
+    metrics: recalculateMetrics(snap.polygon, snap.isPolygonClosed, rotation, state.gridAlign, state.mandalaShape)
+  };
+};
+
+// Record North before a turn of the dial or slider, so the whole turn undoes in one step
+export const commitRotationHistory = (previousRotation) => (state) => {
+  if (typeof previousRotation !== 'number' || previousRotation === state.rotation) return state;
+  return { ...state, history: pushHistory(state, { ...snapshotOf(state), rotation: previousRotation }) };
+};
+
 export const addPolygonVertex = (point) => (state) => {
-  const currentSnapshot = { polygon: state.polygon, isPolygonClosed: state.isPolygonClosed };
+  const currentSnapshot = snapshotOf(state);
   const nextPast = [...(state.history?.past || []), currentSnapshot].slice(-MAX_HISTORY);
   const nextPolygon = [...state.polygon, { x: point.x, y: point.y }];
 
@@ -245,13 +366,13 @@ export const addPolygonVertex = (point) => (state) => {
       past: Object.freeze(nextPast),
       future: Object.freeze([])
     }),
-    metrics: recalculateMetrics(nextPolygon, state.isPolygonClosed, state.rotation, state.gridAlign)
+    metrics: recalculateMetrics(nextPolygon, state.isPolygonClosed, state.rotation, state.gridAlign, state.mandalaShape)
   };
 };
 
 export const closePolygon = () => (state) => {
   if (state.polygon.length < 3) return state;
-  const currentSnapshot = { polygon: state.polygon, isPolygonClosed: state.isPolygonClosed };
+  const currentSnapshot = snapshotOf(state);
   const nextPast = [...(state.history?.past || []), currentSnapshot].slice(-MAX_HISTORY);
 
   return {
@@ -263,7 +384,7 @@ export const closePolygon = () => (state) => {
       past: Object.freeze(nextPast),
       future: Object.freeze([])
     }),
-    metrics: recalculateMetrics(state.polygon, true, state.rotation, state.gridAlign)
+    metrics: recalculateMetrics(state.polygon, true, state.rotation, state.gridAlign, state.mandalaShape)
   };
 };
 
@@ -273,7 +394,7 @@ export const updatePolygonVertex = (index, point) => (state) => {
   return {
     ...state,
     polygon: Object.freeze(nextPolygon),
-    metrics: recalculateMetrics(nextPolygon, state.isPolygonClosed, state.rotation, state.gridAlign)
+    metrics: recalculateMetrics(nextPolygon, state.isPolygonClosed, state.rotation, state.gridAlign, state.mandalaShape)
   };
 };
 
@@ -318,7 +439,7 @@ export const setCursorWorldPos = (pos) => (state) => ({
 });
 
 export const setPolygonPoints = (points, isClosed = true) => (state) => {
-  const currentSnapshot = { polygon: state.polygon, isPolygonClosed: state.isPolygonClosed };
+  const currentSnapshot = snapshotOf(state);
   const nextPast = [...(state.history?.past || []), currentSnapshot].slice(-MAX_HISTORY);
   return {
     ...state,
@@ -328,13 +449,13 @@ export const setPolygonPoints = (points, isClosed = true) => (state) => {
       past: Object.freeze(nextPast),
       future: Object.freeze([])
     }),
-    metrics: recalculateMetrics(points, isClosed, state.rotation, state.gridAlign)
+    metrics: recalculateMetrics(points, isClosed, state.rotation, state.gridAlign, state.mandalaShape)
   };
 };
 
 export const clearBoundary = () => (state) => {
   if (state.polygon.length === 0) return state;
-  const currentSnapshot = { polygon: state.polygon, isPolygonClosed: state.isPolygonClosed };
+  const currentSnapshot = snapshotOf(state);
   const nextPast = [...(state.history?.past || []), currentSnapshot].slice(-MAX_HISTORY);
 
   return {
@@ -350,7 +471,7 @@ export const clearBoundary = () => (state) => {
       past: Object.freeze(nextPast),
       future: Object.freeze([])
     }),
-    metrics: recalculateMetrics([], false, state.rotation, state.gridAlign)
+    metrics: recalculateMetrics([], false, state.rotation, state.gridAlign, state.mandalaShape)
   };
 };
 
@@ -360,13 +481,12 @@ export const undoAction = () => (state) => {
 
   const prevSnapshot = past[past.length - 1];
   const nextPast = past.slice(0, -1);
-  const currentSnapshot = { polygon: state.polygon, isPolygonClosed: state.isPolygonClosed };
+  const currentSnapshot = snapshotOf(state);
   const nextFuture = [currentSnapshot, ...(state.history?.future || [])].slice(0, MAX_HISTORY);
 
   return {
     ...state,
-    polygon: Object.freeze([...prevSnapshot.polygon]),
-    isPolygonClosed: prevSnapshot.isPolygonClosed,
+    ...restoreFrom(state, prevSnapshot),
     isDrawingPolygon: false,
     activeVertexIndex: null,
     draggingVertexIndex: null,
@@ -376,7 +496,6 @@ export const undoAction = () => (state) => {
       past: Object.freeze(nextPast),
       future: Object.freeze(nextFuture)
     }),
-    metrics: recalculateMetrics(prevSnapshot.polygon, prevSnapshot.isPolygonClosed, state.rotation, state.gridAlign)
   };
 };
 
@@ -386,13 +505,12 @@ export const redoAction = () => (state) => {
 
   const nextSnapshot = future[0];
   const nextFuture = future.slice(1);
-  const currentSnapshot = { polygon: state.polygon, isPolygonClosed: state.isPolygonClosed };
+  const currentSnapshot = snapshotOf(state);
   const nextPast = [...(state.history?.past || []), currentSnapshot].slice(-MAX_HISTORY);
 
   return {
     ...state,
-    polygon: Object.freeze([...nextSnapshot.polygon]),
-    isPolygonClosed: nextSnapshot.isPolygonClosed,
+    ...restoreFrom(state, nextSnapshot),
     isDrawingPolygon: false,
     activeVertexIndex: null,
     draggingVertexIndex: null,
@@ -402,7 +520,6 @@ export const redoAction = () => (state) => {
       past: Object.freeze(nextPast),
       future: Object.freeze(nextFuture)
     }),
-    metrics: recalculateMetrics(nextSnapshot.polygon, nextSnapshot.isPolygonClosed, state.rotation, state.gridAlign)
   };
 };
 
@@ -419,15 +536,19 @@ export const restoreProject = (saved) => (state) => {
     ? Object.freeze({ ...saved.calibration })
     : null;
   const layers = Object.freeze({ ...state.layers, ...(saved.layers || {}) });
+  const mandalaShape = saved.mandalaShape === 'rect' ? 'rect' : 'plot';
+  const landDims = saved.landDims && saved.landDims.length > 0 && saved.landDims.breadth > 0 ? Object.freeze({ ...saved.landDims }) : null;
   return {
     ...state,
     polygon,
     isPolygonClosed,
     rotation,
     gridAlign,
+    mandalaShape,
+    landDims,
     calibration,
     layers,
-    metrics: recalculateMetrics(polygon, isPolygonClosed, rotation, gridAlign)
+    metrics: recalculateMetrics(polygon, isPolygonClosed, rotation, gridAlign, mandalaShape)
   };
 };
 export const clearPolygon = clearBoundary;

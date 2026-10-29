@@ -91,10 +91,12 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
   const grid = state.metrics.grid9x9;
   const tatvaData = calculatePanchTatvaSummary(state.metrics.zones16);
   const gateData = calculateGateAssessment(state.metrics.entranceGates32);
-  const landData = calculatePositiveLandEnergy(state.metrics, cal);
+  const landData = calculatePositiveLandEnergy(state.metrics, cal, state.landDims);
+  const gates = state.metrics.entranceGates32 || [];
   const barChart = calculate16BarChart(state.metrics.zones16);
   const vithiData = calculateVithiSummary(state.metrics.vithi);
-  const totalPages = barChart.hasData ? 3 : 2;
+  // Page 4 (the 32 entrances) appears with page 3 whenever the plot is closed
+  const totalPages = barChart.hasData ? 4 : 2;
 
   // Palette constants
   const primaryBlue = [26, 115, 232];
@@ -170,7 +172,7 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
 
   // Column 1
   doc.text(`Total Plot Area: ${formatArea(areaData.plotArea, cal)}`, 20, yPos + 16);
-  doc.text(`Brahmasthan (3×3 Core): ${formatArea(areaData.brahmasthanArea, cal)} (${areaData.brahmasthanRatioPct}%)`, 20, yPos + 23);
+  doc.text(`Brahmasthan: ${formatArea(areaData.brahmasthanArea, cal)} (${areaData.brahmasthanRatioPct}% of the plot)`, 20, yPos + 23);
   doc.text(grid
     ? `Grid Dimensions: ${formatLength(grid.totalWidth, cal)} × ${formatLength(grid.totalHeight, cal)}`
     : 'Grid Dimensions: —', 20, yPos + 30);
@@ -201,7 +203,7 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
   doc.text('• 8 Classical Auspicious Gateways identified: N3/N4 (North), E3/E4 (East), S3/S4 (South), and W3/W4 (West).', 20, yPos + 20);
   doc.text('• 16 Directional Zones radiate at 22.5° intervals from the geometric center of mass (centroid).', 20, yPos + 26);
   if (landData.isActive) {
-    doc.text(`• Positive Land Energy (${landData.length} × ${landData.breadth} ft): ${landData.verdict.title} (Income ${landData.income} vs Expenditure ${landData.expenditure} | Remainder ${landData.remainder} | Ratio ${landData.ratio})`, 20, yPos + 32);
+    doc.text(`• Positive Land Energy (${landData.length} × ${landData.breadth} ft, ${landData.source === 'typed' ? 'typed in' : 'measured from walls'}): ${landData.verdict.title} (Income ${landData.income} vs Expenditure ${landData.expenditure} | Remainder ${landData.remainder}${landData.borderline ? ' — borderline' : ''} | Ratio ${landData.ratio})`, 20, yPos + 32);
   } else if (!cal) {
     doc.text('• Real dimensions not set (Set Scale): areas are in canvas pixels and Land Energy was not evaluated.', 20, yPos + 32);
   }
@@ -481,9 +483,75 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
     doc.setTextColor(...mediumGray);
     if (hasClient) {
       const clientSummary = [clientName, clientPhone].filter(Boolean).join(' · ');
-      doc.text(`Page 3 of 3 — Prepared for: ${clientSummary}`, 14, 287);
+      doc.text(`Page 3 of ${totalPages} — Prepared for: ${clientSummary}`, 14, 287);
     } else {
-      doc.text('Page 3 of 3 — Vastu Mandala Studio Report', 14, 287);
+      doc.text(`Page 3 of ${totalPages} — Vastu Mandala Studio Report`, 14, 287);
+    }
+    doc.text('Open Source · Local-First Vastu Analysis Tool', 135, 287);
+  }
+
+  // ==================== PAGE 4: 32 Entrance Padas ====================
+  if (barChart.hasData && gates.length === 32) {
+    doc.addPage();
+    doc.setFillColor(...primaryBlue);
+    doc.rect(0, 0, 210, 14, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(255, 255, 255);
+    doc.text('32 ENTRANCE PADAS — RESULTS ON THIS PLOT', 14, 9.5);
+    if (hasClient && clientName) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text(`Client: ${clientName}`, 196, 9.5, { align: 'right' });
+    }
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...mediumGray);
+    doc.text('Each entrance is an 11.25° compass slice from the centroid; wall length is the part of the boundary inside that slice.', 14, 20);
+    doc.text('Classical result: Brihat Samhita 53.72–75 (tr. N. C. Iyer, 1884). Rating: the 8 commonly favoured entrances (N3 N4 E3 E4 S3 S4 W3 W4).', 14, 24);
+
+    yPos = 29;
+    doc.setFillColor(...lightBg);
+    doc.rect(14, yPos, 182, 7, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...darkCharcoal);
+    doc.text('Gate', 17, yPos + 4.8);
+    doc.text('Devta', 30, yPos + 4.8);
+    doc.text('Wall', 62, yPos + 4.8);
+    doc.text('Classical result', 84, yPos + 4.8);
+    doc.text('Rating', 176, yPos + 4.8);
+    yPos += 7;
+
+    gates.forEach((g, i) => {
+      if (i % 8 === 0 && i > 0) {
+        doc.setDrawColor(214, 199, 174);
+        doc.line(14, yPos, 196, yPos);
+      }
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(...(g.isAuspicious ? successGreen : darkCharcoal));
+      doc.text(g.code, 17, yPos + 4.6);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...darkCharcoal);
+      doc.text(String(g.name), 30, yPos + 4.6);
+      doc.text(g.wallLength > 0 ? formatLength(g.wallLength, cal) : '—', 62, yPos + 4.6);
+      doc.text(g.result || '', 84, yPos + 4.6);
+      doc.setTextColor(...(g.isAuspicious ? successGreen : mediumGray));
+      doc.text(g.isAuspicious ? 'Favoured' : '—', 176, yPos + 4.6);
+      doc.setDrawColor(241, 243, 244);
+      doc.line(14, yPos + 6.6, 196, yPos + 6.6);
+      yPos += 6.6;
+    });
+
+    doc.setFontSize(8);
+    doc.setTextColor(...mediumGray);
+    if (hasClient) {
+      const clientSummary = [clientName, clientPhone].filter(Boolean).join(' · ');
+      doc.text(`Page 4 of ${totalPages} — Prepared for: ${clientSummary}`, 14, 287);
+    } else {
+      doc.text(`Page 4 of ${totalPages} — Vastu Mandala Studio Report`, 14, 287);
     }
     doc.text('Open Source · Local-First Vastu Analysis Tool', 135, 287);
   }

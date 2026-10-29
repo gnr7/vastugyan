@@ -52,6 +52,8 @@ const snapshotOf = (state) => ({
   isPolygonClosed: state.isPolygonClosed,
   rotation: state.rotation,
   gridAlign: state.gridAlign,
+  mandalaShape: state.mandalaShape,
+  landDims: state.landDims,
   calibration: state.calibration,
   layers: state.layers,
   image: state.image
@@ -83,6 +85,8 @@ export const startAutosave = (store, getImageBlob) => {
         isPolygonClosed: state.isPolygonClosed,
         rotation: state.rotation,
         gridAlign: state.gridAlign,
+        mandalaShape: state.mandalaShape,
+        landDims: state.landDims ? { ...state.landDims } : null,
         calibration: state.calibration ? { ...state.calibration } : null,
         layers: { ...state.layers },
         imageName: state.image ? state.image.name : null,

@@ -3,6 +3,8 @@
  * 81 Padas (Paramasayika Mandala) partition according to classical Vastu Shastra
  */
 
+import { calculatePolygonCentroid } from './geometry.js';
+
 export const DEVTAS_DATA = [
   // --- 1. Central Core (Brahmasthan, 9 Padas) ---
   {
@@ -84,7 +86,7 @@ export const DEVTAS_DATA = [
     sanskrit: 'आप',
     number: 6,
     category: 'inner_diagonal',
-    padas: [[7, 1], [7, 2]],
+    padas: [[6, 1], [6, 2]],
     zone: 'North-East',
     description: 'Life-giving primordial water, vitality, and healing energy.'
   },
@@ -94,7 +96,7 @@ export const DEVTAS_DATA = [
     sanskrit: 'आपवत्स',
     number: 7,
     category: 'inner_diagonal',
-    padas: [[6, 1], [6, 2]],
+    padas: [[7, 1], [7, 2]],
     zone: 'North-East',
     description: 'Carrier of health, rejuvenation, and clear mental perception.'
   },
@@ -128,7 +130,7 @@ export const DEVTAS_DATA = [
     sanskrit: 'इन्द्र (सुत)',
     number: 10,
     category: 'inner_diagonal',
-    padas: [[1, 6], [1, 7]],
+    padas: [[2, 6], [2, 7]],
     zone: 'South-West',
     description: 'Strength, leadership authority, and administrative power.'
   },
@@ -138,7 +140,7 @@ export const DEVTAS_DATA = [
     sanskrit: 'जय',
     number: 11,
     category: 'inner_diagonal',
-    padas: [[2, 6], [2, 7]],
+    padas: [[1, 6], [1, 7]],
     zone: 'South-West',
     description: 'Brings victory in competitive endeavors and overcoming hurdles.'
   },
@@ -543,7 +545,21 @@ export const getDevtaByPadaCoords = (col, row) => {
 };
 
 // Compute the world-space bounding polygon and centroid for each of the 45 Devtas
-export const computeDevtaSpatialFields = (grid9x9) => {
+// Compass slice of an outer Devta's entrance code (N1 starts at 315°, 11.25° each, clockwise)
+const OUTER_START = { N: 315, E: 45, S: 135, W: 225 };
+const sliceOfCode = (code) => {
+  const from = OUTER_START[code[0]] + (Number(code.slice(1)) - 1) * 11.25;
+  return [from % 360, (from + 11.25) % 360];
+};
+
+/**
+ * Spatial field of each of the 45 Devtas on the mandala grid.
+ * In the plot-following mandala the inner Devtas follow the mapped grid and each outer Devta is its
+ * entrance's 11.25° compass slice of the outer ring, as in VastuGrid's reports.
+ * @param {Object} grid9x9 - Grid from buildMandalaGrid (or generate9x9VastuGrid)
+ * @param {number} northDeg - North rotation, for the outer slices
+ */
+export const computeDevtaSpatialFields = (grid9x9, northDeg = 0) => {
   if (!grid9x9 || !grid9x9.padas || grid9x9.padas.length < 81) return [];
 
   // Map padas by key "col,row" for O(1) retrieval
@@ -591,10 +607,22 @@ export const computeDevtaSpatialFields = (grid9x9) => {
     const spanCols = maxCol - minCol + 1;
     const spanRows = maxRow - minRow + 1;
 
+    // Plot-following outline: outer Devtas are compass slices of the ring, inner ones the mapped block
+    let outline = boundaryCorners;
+    let fieldCenter = center;
+    if (grid9x9.shape === 'plot') {
+      outline = devta.entranceCode
+        ? grid9x9.outerSlice(...sliceOfCode(devta.entranceCode), northDeg)
+        : grid9x9.outlineOf(minCol, minRow, maxCol + 1, maxRow + 1);
+      fieldCenter = devta.entranceCode
+        ? calculatePolygonCentroid(outline)
+        : grid9x9.mapPoint((minCol + maxCol + 1) / 2, (minRow + maxRow + 1) / 2);
+    }
+
     return {
       ...devta,
-      center,
-      boundaryCorners,
+      center: fieldCenter,
+      boundaryCorners: outline,
       memberPadas,
       spanCols,
       spanRows,

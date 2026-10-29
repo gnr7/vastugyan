@@ -5,10 +5,7 @@
 
 import {
   calculatePolygonArea,
-  calculateSignedArea,
   clipPolygonByConvex,
-  rayPolygonHit,
-  boundaryPathBetween,
   distance
 } from './geometry.js';
 
@@ -142,10 +139,23 @@ const GATE_FACES = [
 ];
 const GATE_SPAN_DEG = 360 / 32; // 11.25°
 
+// Brihat Samhita 53.72–75 (tr. N. Chidambaram Iyer, 1884): result of a door in each of the
+// 8 squares of a side, counted from the corner where that side's numbering starts
+export const ENTRANCE_RESULTS_BS = {
+  E: ['Injury from fire', 'Birth of daughters', 'Gain of immense wealth', 'Friendship of the king', 'Increase of anger', 'Untruthfulness', 'Cruelty', 'Theft'],
+  S: ['Few sons', 'Servitude', 'Fall in status', 'Excess eating and drinking, more sons', 'Anger', 'Ingratitude', 'Poverty', 'Loss of sons and valour'],
+  W: ['Suffering of sons', 'Increase of enemies', 'Want of wealth and sons', 'Increase of sons, wealth and strength', 'Opulence', 'Fear from rulers', 'Loss of wealth', 'Disease'],
+  N: ['Cruelty, many kinsmen', 'Increase of enemies', 'Gain of wealth and sons', 'All virtues', 'Sons and wealth', 'Hatred of sons', 'Loss of character of women', 'Loss of wealth']
+};
+
+const polylineLength = (pts) => pts.slice(1).reduce((t, p, i) => t + distance(p, pts[i]), 0);
+
 /**
  * Pure calculation of the 32 Perimeter Entrance Gates by compass angle.
- * Each gate is an 11.25° slice seen from the centroid (rotated with North), marked where
- * the slice actually meets the plot boundary — so labels sit on the real walls.
+ * Each gate is an 11.25° slice seen from the centroid (rotated with North). The plot boundary is
+ * cut wherever a slice line crosses it, and every piece of wall goes to the slice its direction
+ * falls in — so the 32 gates always cover the whole boundary exactly once, even on U-shaped or
+ * courtyard plans where the centroid lies outside the building and a slice meets several walls.
  * @param {Array} points - Closed plot polygon in world coordinates
  * @param {Object} centroid - { x, y }
  * @param {number} angleDeg - Universal rotation (North) in degrees
@@ -153,40 +163,87 @@ const GATE_SPAN_DEG = 360 / 32; // 11.25°
  */
 export const calculate32EntranceGates = (points, centroid, angleDeg = 0, devtaFields = null) => {
   if (!points || points.length < 3 || !centroid) return [];
-
-  const reach = 2 * Math.max(...points.map((p) => distance(p, centroid))) + 1;
-  // Increasing screen angle is clockwise on a y-down canvas, matching a clockwise vertex order
-  const forward = calculateSignedArea(points) > 0;
+  const n = points.length;
 
   const directionAt = (compassDeg) => {
     const rad = ((-90 + compassDeg + angleDeg) * Math.PI) / 180;
     return { x: Math.cos(rad), y: Math.sin(rad) };
   };
-  const hitAt = (compassDeg) => {
-    const dir = directionAt(compassDeg);
-    return rayPolygonHit(points, centroid, dir) || {
-      point: { x: centroid.x + dir.x * reach, y: centroid.y + dir.y * reach },
-      edgeIndex: -1,
-      t: 0,
-      dist: reach
-    };
+  // Compass bearing (relative to North) of a point seen from the centroid
+  const bearingOf = (p) => {
+    const screenDeg = (Math.atan2(p.x - centroid.x, -(p.y - centroid.y)) * 180) / Math.PI;
+    return ((screenDeg - angleDeg) % 360 + 360) % 360;
   };
+  // Gate index 0..31 in N1..N8, E1..E8, S1..S8, W1..W8 order (N1 starts at compass 315°)
+  const gateIndexAt = (bearing) => Math.floor((((bearing - 315) % 360 + 360) % 360) / GATE_SPAN_DEG) % 32;
+
+  // 1. Cut every edge where it crosses one of the 32 slice lines (half-lines from the centroid)
+  const pieces = [];
+  for (let i = 0; i < n; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % n];
+    const ts = [0, 1];
+    for (let k = 0; k < 32; k++) {
+      const dir = directionAt(315 + k * GATE_SPAN_DEG);
+      const ex = b.x - a.x;
+      const ey = b.y - a.y;
+      const denom = dir.x * ey - dir.y * ex;
+      if (Math.abs(denom) < 1e-12) continue;
+      const ox = a.x - centroid.x;
+      const oy = a.y - centroid.y;
+      const along = (ox * ey - oy * ex) / denom;   // distance along the slice line
+      const t = (ox * dir.y - oy * dir.x) / denom; // position along the edge
+      if (along > 1e-9 && t > 1e-9 && t < 1 - 1e-9) ts.push(t);
+    }
+    ts.sort((x, y) => x - y);
+    for (let j = 0; j < ts.length - 1; j++) {
+      if (ts[j + 1] - ts[j] < 1e-12) continue;
+      const p0 = { x: a.x + (b.x - a.x) * ts[j], y: a.y + (b.y - a.y) * ts[j] };
+      const p1 = { x: a.x + (b.x - a.x) * ts[j + 1], y: a.y + (b.y - a.y) * ts[j + 1] };
+      const mid = { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 };
+      pieces.push({ gate: gateIndexAt(bearingOf(mid)), p0, p1 });
+    }
+  }
+
+  // 2. Join consecutive pieces of the same gate into polylines (wrapping around the start)
+  const runs = [];
+  pieces.forEach((pc) => {
+    const last = runs[runs.length - 1];
+    if (last && last.gate === pc.gate) last.pts.push(pc.p1);
+    else runs.push({ gate: pc.gate, pts: [pc.p0, pc.p1] });
+  });
+  if (runs.length > 1 && runs[0].gate === runs[runs.length - 1].gate) {
+    const tail = runs.pop();
+    runs[0].pts = tail.pts.concat(runs[0].pts.slice(1));
+  }
 
   const gates = [];
-
-  GATE_FACES.forEach(({ prefix, category, side, startDeg }) => {
+  GATE_FACES.forEach(({ prefix, category, side, startDeg }, face) => {
     for (let i = 0; i < 8; i++) {
+      const index = face * 8 + i;
       const code = `${prefix}${i + 1}`;
       const fromDeg = startDeg + i * GATE_SPAN_DEG;
       const toDeg = fromDeg + GATE_SPAN_DEG;
-
-      const hitStart = hitAt(fromDeg);
-      const hitEnd = hitAt(toDeg);
-      const hitMid = hitAt(fromDeg + GATE_SPAN_DEG / 2);
-      const path = (hitStart.edgeIndex >= 0 && hitEnd.edgeIndex >= 0)
-        ? boundaryPathBetween(points, hitStart, hitEnd, forward)
-        : [hitStart.point, hitEnd.point];
-
+      const paths = runs.filter((r) => r.gate === index).map((r) => r.pts);
+      // The label and ticks go on the longest stretch of wall in the slice
+      const main = paths.slice().sort((x, y) => polylineLength(y) - polylineLength(x))[0] || null;
+      let midpoint = null;
+      if (main) {
+        const half = polylineLength(main) / 2;
+        let acc = 0;
+        for (let j = 1; j < main.length && !midpoint; j++) {
+          const seg = distance(main[j - 1], main[j]);
+          if (acc + seg >= half) {
+            const f = seg > 0 ? (half - acc) / seg : 0;
+            midpoint = { x: main[j - 1].x + (main[j].x - main[j - 1].x) * f, y: main[j - 1].y + (main[j].y - main[j - 1].y) * f };
+          }
+          acc += seg;
+        }
+      }
+      const radial = (p) => {
+        const d = distance(p, centroid) || 1;
+        return { x: (p.x - centroid.x) / d, y: (p.y - centroid.y) / d };
+      };
       const devta = devtaFields ? devtaFields.find((d) => d.entranceCode === code) : null;
 
       gates.push({
@@ -195,18 +252,21 @@ export const calculate32EntranceGates = (points, centroid, angleDeg = 0, devtaFi
         code,
         number: devta ? devta.number : i + 1,
         isAuspicious: AUSPICIOUS_ENTRANCES.has(code),
+        result: ENTRANCE_RESULTS_BS[prefix][i],
         category,
         side,
         segmentIndex: i,
         fromDeg: fromDeg % 360,
         toDeg: toDeg % 360,
-        center: hitMid.point,
-        path,
-        outerEdgeStart: hitStart.point,
-        outerEdgeEnd: hitEnd.point,
-        startNormal: directionAt(fromDeg),
-        endNormal: directionAt(toDeg),
-        edgeMidpoint: hitMid.point,
+        paths,
+        path: main || [],
+        wallLength: paths.reduce((t, pts) => t + polylineLength(pts), 0),
+        center: midpoint,
+        outerEdgeStart: main ? main[0] : null,
+        outerEdgeEnd: main ? main[main.length - 1] : null,
+        startNormal: main ? radial(main[0]) : directionAt(fromDeg),
+        endNormal: main ? radial(main[main.length - 1]) : directionAt(toDeg),
+        edgeMidpoint: midpoint,
         normal: directionAt(fromDeg + GATE_SPAN_DEG / 2),
         attribute: devta ? devta.description : ''
       });

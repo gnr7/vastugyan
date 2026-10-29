@@ -2,7 +2,8 @@
  * Vastu Mandala Studio — Canvas Viewport & Pure Geometry Rendering Engine
  */
 
-import { distance, findClosestVertex } from './geometry.js';
+import { distance, findClosestVertex, rayPolygonHit } from './geometry.js';
+import { AUSPICIOUS_ENTRANCES } from './zones.js';
 import {
   addPolygonVertex,
   closePolygon,
@@ -17,7 +18,7 @@ import {
 
 // Touch ergonomics: finger-sized hit areas and a magnifier while placing or dragging points
 const TOUCH_HIT_RADIUS = 26;   // px around a vertex that a finger can grab
-const TOUCH_SNAP_RADIUS = 30;  // px from point 0 that closes the boundary on lift
+const TOUCH_SNAP_RADIUS = 12;  // px from point 0 that closes the boundary on lift (small, so nearby corners can still be placed)
 const LOUPE_RADIUS = 56;
 const LOUPE_ZOOM = 2.5;
 
@@ -28,6 +29,24 @@ const haptic = (pattern) => {
   } catch {
     /* not supported */
   }
+};
+
+// Keeps labels from piling up: a label is drawn only if its box doesn't overlap one already placed
+const createLabelSpace = () => {
+  const boxes = [];
+  return (x, y, w, h) => {
+    const box = { x0: x - w / 2, y0: y - h / 2, x1: x + w / 2, y1: y + h / 2 };
+    if (boxes.some((b) => box.x0 < b.x1 && box.x1 > b.x0 && box.y0 < b.y1 && box.y1 > b.y0)) return false;
+    boxes.push(box);
+    return true;
+  };
+};
+
+const tracePolygon = (ctx, pts) => {
+  if (!pts || pts.length < 2) return;
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+  ctx.closePath();
 };
 
 // Canvas chrome colours, read from the CSS design tokens so light and dark themes match
@@ -183,6 +202,22 @@ export const drawPolygon = (ctx, state) => {
     }
   }
 
+  // 1b. A boundary that crosses itself: show the offending edges in red
+  const crossings = state.metrics && state.metrics.crossings;
+  if (crossings && crossings.length) {
+    ctx.beginPath();
+    crossings.flat().forEach((i) => {
+      const a = polygon[i];
+      const b = polygon[(i + 1) % n];
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+    });
+    ctx.strokeStyle = THEME.kumkum;
+    ctx.lineWidth = 4 / scale;
+    ctx.setLineDash([]);
+    ctx.stroke();
+  }
+
   // 2. Draw vertex handles and numbered labels
   polygon.forEach((vertex, idx) => {
     const isHovered = hoverVertexIndex === idx;
@@ -266,8 +301,9 @@ export const drawCentroidMarker = (ctx, centroid, scale) => {
   const fontSize = Math.max(9, Math.min(11, 10 / Math.sqrt(scale)));
   ctx.font = `600 ${fontSize}px 'Hanken Grotesk', sans-serif`;
   ctx.fillStyle = THEME.kumkum;
-  ctx.textAlign = 'center';
-  ctx.fillText('Centroid', centroid.x, centroid.y + outerR + fontSize);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Centroid', centroid.x + outerR + 3 / scale, centroid.y + outerR);
 
   ctx.restore();
 };
@@ -337,62 +373,37 @@ export const drawVithiMandal = (ctx, vithi, scale, layers) => {
 
 export const draw9x9Grid = (ctx, grid9x9, scale, layers) => {
   if (!grid9x9 || !grid9x9.padas || grid9x9.padas.length === 0) return;
-
   const showGrid = layers.grid9x9;
   const showBrahmasthan = layers.brahmasthan;
-
   if (!showGrid && !showBrahmasthan) return;
 
   ctx.save();
-
-  // 1. Render 9x9 Grid (Thin, clean Google style lines)
   if (showGrid) {
-    // A. Outer bounding box of 9x9 matrix
+    // Outer edge of the mandala, then the 81 padas
     ctx.beginPath();
-    ctx.moveTo(grid9x9.outerBox[0].x, grid9x9.outerBox[0].y);
-    ctx.lineTo(grid9x9.outerBox[1].x, grid9x9.outerBox[1].y);
-    ctx.lineTo(grid9x9.outerBox[2].x, grid9x9.outerBox[2].y);
-    ctx.lineTo(grid9x9.outerBox[3].x, grid9x9.outerBox[3].y);
-    ctx.closePath();
-    ctx.strokeStyle = '#5f6368';
-    ctx.lineWidth = 1.5 / scale;
+    tracePolygon(ctx, grid9x9.outerOutline || grid9x9.outerBox);
+    ctx.strokeStyle = 'rgba(42, 31, 23, 0.55)';
+    ctx.lineWidth = 1.4 / scale;
     ctx.setLineDash([]);
     ctx.stroke();
 
-    // B. Internal 81 padas lines
     ctx.beginPath();
-    grid9x9.padas.forEach((pada) => {
-      ctx.moveTo(pada.corners[0].x, pada.corners[0].y);
-      ctx.lineTo(pada.corners[1].x, pada.corners[1].y);
-      ctx.lineTo(pada.corners[2].x, pada.corners[2].y);
-      ctx.lineTo(pada.corners[3].x, pada.corners[3].y);
-      ctx.closePath();
-    });
-    ctx.strokeStyle = 'rgba(95, 99, 104, 0.4)';
+    grid9x9.padas.forEach((pada) => tracePolygon(ctx, pada.outline || pada.corners));
+    ctx.strokeStyle = 'rgba(42, 31, 23, 0.28)';
     ctx.lineWidth = 1 / scale;
     ctx.stroke();
   }
 
-  // 2. Render Brahmasthan (Sacred Central 3x3 Padas)
-  if (showBrahmasthan && grid9x9.brahmasthanBox) {
+  if (showBrahmasthan) {
     ctx.beginPath();
-    ctx.moveTo(grid9x9.brahmasthanBox[0].x, grid9x9.brahmasthanBox[0].y);
-    ctx.lineTo(grid9x9.brahmasthanBox[1].x, grid9x9.brahmasthanBox[1].y);
-    ctx.lineTo(grid9x9.brahmasthanBox[2].x, grid9x9.brahmasthanBox[2].y);
-    ctx.lineTo(grid9x9.brahmasthanBox[3].x, grid9x9.brahmasthanBox[3].y);
-    ctx.closePath();
-
-    // Soft energetic red fill
-    ctx.fillStyle = 'rgba(217, 48, 37, 0.12)';
+    tracePolygon(ctx, grid9x9.brahmasthanOutline || grid9x9.brahmasthanBox);
+    ctx.fillStyle = 'rgba(179, 38, 30, 0.12)';
     ctx.fill();
-
-    // Strong red outline
-    ctx.strokeStyle = '#d93025';
+    ctx.strokeStyle = THEME.kumkum;
     ctx.lineWidth = 2.2 / scale;
     ctx.setLineDash([]);
     ctx.stroke();
   }
-
   ctx.restore();
 };
 
@@ -541,77 +552,124 @@ export const draw45Devtas = (ctx, devtaFields, scale, layers, angleDeg = 0) => {
 };
 
 // Render 16 Directional Zones (22.5° rays, sector fills, directional badges)
-export const draw16Zones = (ctx, zones16, scale, layers) => {
+const ELEMENT_STYLE = {
+  Water: { color: '#2C6FB7', fill: 'rgba(44, 111, 183, 0.22)', label: 'Water area' },
+  Air: { color: '#3E8E5E', fill: 'rgba(62, 142, 94, 0.22)', label: 'Air area' },
+  Fire: { color: '#C2412B', fill: 'rgba(194, 65, 43, 0.20)', label: 'Fire area' },
+  Earth: { color: '#B8862B', fill: 'rgba(184, 134, 43, 0.24)', label: 'Earth area' },
+  Space: { color: '#7D7590', fill: 'rgba(125, 117, 144, 0.22)', label: 'Space area' }
+};
+
+const drawPill = (ctx, text, x, y, fontWorld, scale, color, place) => {
+  ctx.font = `600 ${fontWorld}px 'Hanken Grotesk', sans-serif`;
+  const w = ctx.measureText(text).width + 8 / scale;
+  const h = fontWorld + 4 / scale;
+  if (place && !place(x, y, w, h)) return;
+  ctx.fillStyle = 'rgba(255, 252, 246, 0.94)';
+  ctx.fillRect(x - w / 2, y - h / 2, w, h);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1 / scale;
+  ctx.strokeRect(x - w / 2, y - h / 2, w, h);
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, x, y);
+};
+
+// Render the 16 directional zones and/or the Five Elements view.
+// With a closed plot both are clipped to it: rays end on the walls and labels sit inside.
+export const draw16Zones = (ctx, zones16, scale, layers, plot = null) => {
   if (!zones16 || !zones16.zones || zones16.zones.length === 0) return;
   if (!layers.zones16 && !layers.elements) return;
-
   const { centroid, radius, zones } = zones16;
-
-  ctx.save();
-
-  // 1. Sector Fills (Translucent Elemental Tinting)
-  zones.forEach((z) => {
+  const closed = plot && plot.length >= 3;
+  const reach = closed ? 4 * Math.max(...plot.map((p) => distance(p, centroid))) + 1 : radius;
+  const fontWorld = Math.max(9, Math.min(13, 11 / Math.sqrt(scale))) / scale;
+  const place = createLabelSpace();
+  const hitDistance = (rad) => {
+    if (!closed) return radius;
+    const hit = rayPolygonHit(plot, centroid, { x: Math.cos(rad), y: Math.sin(rad) });
+    return hit ? hit.dist : radius;
+  };
+  const wedge = (startRad, endRad) => {
     ctx.beginPath();
     ctx.moveTo(centroid.x, centroid.y);
-    ctx.arc(centroid.x, centroid.y, radius, z.startRad, z.endRad, false);
+    ctx.arc(centroid.x, centroid.y, reach, startRad, endRad, false);
     ctx.closePath();
-    ctx.fillStyle = z.bgTint;
-    ctx.fill();
-  });
+  };
 
-  // 2. Outer Perimeter Circle
-  ctx.beginPath();
-  ctx.arc(centroid.x, centroid.y, radius, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(95, 99, 104, 0.35)';
-  ctx.lineWidth = 1 / scale;
-  ctx.setLineDash([]);
-  ctx.stroke();
+  ctx.save();
+  if (closed) {
+    ctx.beginPath();
+    tracePolygon(ctx, plot);
+    ctx.clip();
+  }
 
-  // 3. 16 Boundary Rays
+  // Fills: one per element in the Five Elements view, a light tint per zone otherwise
+  if (layers.elements) {
+    zones.forEach((z) => {
+      wedge(z.startRad, z.endRad);
+      ctx.fillStyle = ELEMENT_STYLE[z.element].fill;
+      ctx.fill();
+    });
+  } else {
+    zones.forEach((z) => {
+      wedge(z.startRad, z.endRad);
+      ctx.fillStyle = z.bgTint;
+      ctx.fill();
+    });
+  }
+
+  // Rays: every zone boundary for 16 zones; only element boundaries for the Five Elements view
   ctx.beginPath();
-  zones.forEach((z) => {
+  zones.forEach((z, i) => {
+    const prev = zones[(i + zones.length - 1) % zones.length];
+    if (!layers.zones16 && prev.element === z.element) return;
     ctx.moveTo(centroid.x, centroid.y);
-    ctx.lineTo(z.rayEnd.x, z.rayEnd.y);
+    ctx.lineTo(centroid.x + Math.cos(z.startRad) * reach, centroid.y + Math.sin(z.startRad) * reach);
   });
-  ctx.strokeStyle = 'rgba(95, 99, 104, 0.45)';
-  ctx.lineWidth = 1 / scale;
-  ctx.setLineDash([4 / scale, 3 / scale]);
+  ctx.strokeStyle = layers.zones16 ? 'rgba(42, 31, 23, 0.55)' : 'rgba(42, 31, 23, 0.7)';
+  ctx.lineWidth = (layers.zones16 ? 1 : 1.4) / scale;
+  ctx.setLineDash(layers.zones16 ? [4 / scale, 3 / scale] : []);
   ctx.stroke();
   ctx.setLineDash([]);
+  ctx.restore();
 
-  // 4. Directional Zone Labels (N, NNE, NE, etc.)
-  const fontSizePx = Math.max(9, Math.min(13, 11 / Math.sqrt(scale)));
-  const fontSizeWorld = fontSizePx / scale;
-
-  zones.forEach((z) => {
+  if (!closed) {
     ctx.save();
-    ctx.translate(z.labelPos.x, z.labelPos.y);
-
-    const labelText = z.short;
-    ctx.font = `600 ${fontSizeWorld}px 'Hanken Grotesk', sans-serif`;
-    const textW = ctx.measureText(labelText).width;
-    const padX = 4 / scale;
-    const padY = 2 / scale;
-    const pillW = textW + padX * 2;
-    const pillH = fontSizeWorld + padY * 2;
-
-    // Pill background
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-    ctx.fillRect(-pillW / 2, -pillH / 2, pillW, pillH);
-
-    ctx.strokeStyle = z.color;
+    ctx.beginPath();
+    ctx.arc(centroid.x, centroid.y, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(42, 31, 23, 0.3)';
     ctx.lineWidth = 1 / scale;
-    ctx.strokeRect(-pillW / 2, -pillH / 2, pillW, pillH);
-
-    // Label text
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = z.color;
-    ctx.fillText(labelText, 0, 0);
-
+    ctx.stroke();
     ctx.restore();
-  });
+  }
 
+  // Labels inside the plot along each zone's middle direction
+  ctx.save();
+  if (layers.zones16) {
+    zones.forEach((z) => {
+      const d = hitDistance(z.centerRad) * (closed ? 0.78 : 0.92);
+      drawPill(ctx, z.short, centroid.x + Math.cos(z.centerRad) * d, centroid.y + Math.sin(z.centerRad) * d, fontWorld, scale, z.color, place);
+    });
+  }
+  if (layers.elements) {
+    const groups = [];
+    zones.forEach((z) => {
+      const last = groups[groups.length - 1];
+      if (last && last.element === z.element) last.zones.push(z);
+      else groups.push({ element: z.element, zones: [z] });
+    });
+    if (groups.length > 1 && groups[0].element === groups[groups.length - 1].element) {
+      groups[0].zones = groups.pop().zones.concat(groups[0].zones);
+    }
+    groups.forEach((g) => {
+      const mid = g.zones[Math.floor(g.zones.length / 2)];
+      const rad = g.zones.length % 2 ? mid.centerRad : mid.startRad;
+      const d = hitDistance(rad) * 0.5;
+      drawPill(ctx, ELEMENT_STYLE[g.element].label, centroid.x + Math.cos(rad) * d, centroid.y + Math.sin(rad) * d, fontWorld * 1.1, scale, ELEMENT_STYLE[g.element].color, place);
+    });
+  }
   ctx.restore();
 };
 
@@ -635,11 +693,14 @@ export const draw32EntranceGates = (ctx, entranceGates32, scale, layers, angleDe
   };
 
   // Trace a gate's stretch of the real plot boundary
+  // A gate can own several stretches of wall (e.g. both arms of a U-shaped plan)
   const traceGatePath = (gate) => {
-    const path = gate.path && gate.path.length >= 2 ? gate.path : [gate.outerEdgeStart, gate.outerEdgeEnd];
     ctx.beginPath();
-    ctx.moveTo(path[0].x, path[0].y);
-    path.slice(1).forEach((pt) => ctx.lineTo(pt.x, pt.y));
+    (gate.paths || [gate.path]).forEach((path) => {
+      if (!path || path.length < 2) return;
+      ctx.moveTo(path[0].x, path[0].y);
+      path.slice(1).forEach((pt) => ctx.lineTo(pt.x, pt.y));
+    });
   };
 
   // 1. Draw perimeter edge segments and divider ticks
@@ -686,6 +747,7 @@ export const draw32EntranceGates = (ctx, entranceGates32, scale, layers, angleDe
   const fontSizeWorld = fontSizePx / scale;
   const offsetDist = 16 / scale;
 
+  const placeGate = createLabelSpace();
   entranceGates32.forEach((gate) => {
     if (!gate.edgeMidpoint) return;
 
@@ -706,6 +768,10 @@ export const draw32EntranceGates = (ctx, entranceGates32, scale, layers, angleDe
     const pillW = textW + padX * 2;
     const pillH = fontSizeWorld + padY * 2;
     const pillR = 3 / scale;
+    if (!placeGate(labelX, labelY, pillW, pillH)) {
+      ctx.restore();
+      return;
+    }
 
     if (gate.isAuspicious) {
       // Bold green badge for auspicious entrances
@@ -743,6 +809,31 @@ export const draw32EntranceGates = (ctx, entranceGates32, scale, layers, angleDe
   ctx.restore();
 };
 
+// Render the 32 outer padas of the mandala with their entrance codes ("32 gates 81 pad")
+export const drawGatePadas = (ctx, devtaFields, scale, layers, auspicious) => {
+  if (!devtaFields || !layers.gatePadas) return;
+  const outer = devtaFields.filter((d) => d.entranceCode);
+  const fontWorld = Math.max(9, Math.min(13, 11 / Math.sqrt(scale))) / scale;
+  ctx.save();
+  outer.forEach((d) => {
+    ctx.beginPath();
+    tracePolygon(ctx, d.boundaryCorners);
+    if (auspicious && auspicious.has(d.entranceCode)) {
+      ctx.fillStyle = 'rgba(47, 122, 75, 0.16)';
+      ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(42, 31, 23, 0.85)';
+    ctx.lineWidth = 1.6 / scale;
+    ctx.stroke();
+  });
+  const place = createLabelSpace();
+  outer.forEach((d) => {
+    const good = auspicious && auspicious.has(d.entranceCode);
+    drawPill(ctx, d.entranceCode, d.center.x, d.center.y, fontWorld, scale, good ? '#2F7A4B' : '#2A1F17', place);
+  });
+  ctx.restore();
+};
+
 // Render Marma Sthan (Classical Diagonal Energy Lines & 9 Sensitive Nodes)
 export const drawMarmaSthan = (ctx, marmaSthan, scale, layers) => {
   if (!marmaSthan || !layers.marma) return;
@@ -760,8 +851,9 @@ export const drawMarmaSthan = (ctx, marmaSthan, scale, layers) => {
 
   lines.forEach((line) => {
     if (!line.start || !line.end) return;
-    ctx.moveTo(line.start.x, line.start.y);
-    ctx.lineTo(line.end.x, line.end.y);
+    const pts = line.points && line.points.length >= 2 ? line.points : [line.start, line.end];
+    ctx.moveTo(pts[0].x, pts[0].y);
+    pts.slice(1).forEach((pt) => ctx.lineTo(pt.x, pt.y));
   });
 
   ctx.stroke();
@@ -1023,7 +1115,7 @@ export class CanvasController {
         ...prev,
         polygon: Object.freeze([...gesture.snapshot.polygon]),
         draggingVertexIndex: null,
-        metrics: recalculateMetrics(gesture.snapshot.polygon, gesture.snapshot.isPolygonClosed, prev.rotation, prev.gridAlign)
+        metrics: recalculateMetrics(gesture.snapshot.polygon, gesture.snapshot.isPolygonClosed, prev.rotation, prev.gridAlign, prev.mandalaShape)
       }));
     } else if (gesture.mode === 'place') {
       this.store.setState(setHoverVertex(null));
@@ -1091,6 +1183,8 @@ export class CanvasController {
   // Magnifier above the finger so the exact point under it stays visible
   drawLoupe(ctx) {
     if (!this.loupe) return;
+    const st = this.store.getState();
+    const willClose = this.touch && this.touch.mode === 'place' && st.isDrawingPolygon && st.hoverVertexIndex === 0;
     const { x, y } = this.loupe;
     const r = LOUPE_RADIUS;
     const zoom = LOUPE_ZOOM;
@@ -1141,6 +1235,20 @@ export class CanvasController {
     ctx.moveTo(cx, cy + 3);
     ctx.lineTo(cx, cy + 10);
     ctx.stroke();
+    if (willClose) {
+      const label = 'Lift to close';
+      ctx.font = "700 12px 'Hanken Grotesk', sans-serif";
+      const w = ctx.measureText(label).width + 16;
+      ctx.fillStyle = '#2F7A4B';
+      ctx.beginPath();
+      if (typeof ctx.roundRect === 'function') ctx.roundRect(cx - w / 2, cy + r - 12, w, 22, 11);
+      else ctx.rect(cx - w / 2, cy + r - 12, w, 22);
+      ctx.fill();
+      ctx.fillStyle = '#FFFCF6';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, cx, cy + r - 1);
+    }
     ctx.restore();
   }
 
@@ -1390,12 +1498,57 @@ export class CanvasController {
     }));
   }
 
-  render(state) {
+  /**
+   * Draw the whole plan (image and plot, every visible layer) into a new canvas of a fixed size,
+   * independent of the current zoom and pan — used for the PDF report and the plan image.
+   */
+  snapshot(width = 1800, height = 1130) {
+    const state = this.store.getState();
+    const off = document.createElement('canvas');
+    off.width = width;
+    off.height = height;
+    const saved = { ctx: this.ctx, width: this.width, height: this.height, loupe: this.loupe };
+    let contentW = 800;
+    let contentH = 600;
+    let originX = 0;
+    let originY = 0;
+    const b = state.metrics.bounds;
+    if (state.image && b) {
+      originX = Math.min(0, b.minX);
+      originY = Math.min(0, b.minY);
+      contentW = Math.max(state.image.width, b.maxX) - originX;
+      contentH = Math.max(state.image.height, b.maxY) - originY;
+    } else if (state.image) {
+      contentW = state.image.width;
+      contentH = state.image.height;
+    } else if (b) {
+      originX = b.minX;
+      originY = b.minY;
+      contentW = b.width || 800;
+      contentH = b.height || 600;
+    }
+    const fit = computeFitViewport(contentW, contentH, width, height, 50);
+    const viewport = { ...state.viewport, scale: fit.scale, x: fit.x - originX * fit.scale, y: fit.y - originY * fit.scale };
+    try {
+      this.ctx = off.getContext('2d');
+      this.width = width;
+      this.height = height;
+      this.loupe = null;
+      this.ctx.fillStyle = '#FFFCF6';
+      this.ctx.fillRect(0, 0, width, height);
+      this.render({ ...state, viewport }, { transparent: true });
+    } finally {
+      Object.assign(this, saved);
+    }
+    return off;
+  }
+
+  render(state, { transparent = false } = {}) {
     const { ctx, width, height } = this;
     if (!ctx || !width || !height) return;
 
-    // 1. Clear viewport
-    ctx.clearRect(0, 0, width, height);
+    // 1. Clear viewport (a snapshot keeps the paper background it was given)
+    if (!transparent) ctx.clearRect(0, 0, width, height);
 
     // 2. Draw background grid
     drawBackgroundGrid(ctx, state.viewport, width, height);
@@ -1412,7 +1565,7 @@ export class CanvasController {
 
     // 5. Render 16 Directional Zones Overlay (Sector fills, 22.5° rays, zone labels)
     if (state.metrics.zones16) {
-      draw16Zones(ctx, state.metrics.zones16, state.viewport.scale, state.layers);
+      draw16Zones(ctx, state.metrics.zones16, state.viewport.scale, state.layers, state.isPolygonClosed ? state.polygon : null);
     }
 
     // 5b. Vithi Mandal rings (under the grid lines)
@@ -1428,6 +1581,7 @@ export class CanvasController {
     // 7. Render 45 Devtas Overlay & Labels
     if (state.metrics.devtaFields) {
       draw45Devtas(ctx, state.metrics.devtaFields, state.viewport.scale, state.layers, state.metrics.gridAngle);
+      drawGatePadas(ctx, state.metrics.devtaFields, state.viewport.scale, state.layers, AUSPICIOUS_ENTRANCES);
     }
 
     // 8. Render 32 Perimeter Entrance Gates & Auspicious Highlights

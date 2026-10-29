@@ -1,23 +1,31 @@
-import { calculateMarmaSthan, calculatePolygonCentroid } from '../js/geometry.js';
+/**
+ * Marma sthan follows Brihat Samhita 53.63–64: six vamsa lines (two corner diagonals plus four
+ * two padas off them) crossing at nine atimarma points, squares 23 31 33 39 41 43 49 51 59.
+ * Run: node scratch/test_marma.js
+ */
+import assert from 'node:assert/strict';
+import { recalculateMetrics } from '../js/state.js';
 
-const polygon = [
-  { x: 100, y: 100 },
-  { x: 500, y: 100 },
-  { x: 500, y: 500 },
-  { x: 100, y: 500 }
-];
+const square = [{ x: 0, y: 0 }, { x: 900, y: 0 }, { x: 900, y: 900 }, { x: 0, y: 900 }];
+const pada = 100;
 
-const centroid = calculatePolygonCentroid(polygon);
-const marma0 = calculateMarmaSthan(polygon, centroid, 0);
-console.log('Rotation 0deg:');
-console.log('Lines count:', marma0.lines.length);
-console.log('Points count:', marma0.marmaPoints.length);
-console.log('Points:', marma0.marmaPoints.map(p => `${p.name}: (${Math.round(p.x)}, ${Math.round(p.y)})`));
+for (const shape of ['plot', 'rect']) {
+  const m = recalculateMetrics(square, true, 0, 'north', shape).marmaSthan;
+  assert.equal(m.lines.length, 6);
+  assert.equal(m.marmaPoints.length, 9);
+  // Atimarma at pada centres; square number = row * 9 + col + 1
+  const squares = m.marmaPoints.map((p) => Math.floor(p.y / pada) * 9 + Math.floor(p.x / pada) + 1).sort((a, b) => a - b);
+  assert.deepEqual(squares, [23, 31, 33, 39, 41, 43, 49, 51, 59]);
+  // Every point sits on two of the lines
+  const onLine = (p, l) => Math.abs((l.end.x - l.start.x) * (l.start.y - p.y) - (l.end.y - l.start.y) * (l.start.x - p.x)) / Math.hypot(l.end.x - l.start.x, l.end.y - l.start.y) < 1e-6;
+  m.marmaPoints.forEach((p) => assert.ok(m.lines.filter((l) => onLine(p, l)).length >= 2, `${p.name} not on two lines`));
+  // Mukhya–Bhrisha line runs from N3's corner to E7's corner
+  const mb = m.lines.find((l) => l.name === 'Mukhya – Bhrisha');
+  assert.deepEqual([Math.round(mb.start.x), Math.round(mb.start.y), Math.round(mb.end.x), Math.round(mb.end.y)], [200, 0, 900, 700]);
+  console.log(`  ✔ ${shape}: 6 vamsa lines, atimarma squares 23 31 33 39 41 43 49 51 59`);
+}
 
-const marma25 = calculateMarmaSthan(polygon, centroid, 25);
-console.log('\nRotation 25deg:');
-console.log('Lines count:', marma25.lines.length);
-console.log('Points count:', marma25.marmaPoints.length);
-console.log('Center point at 25deg:', Math.round(marma25.marmaPoints[0].x), Math.round(marma25.marmaPoints[0].y));
-console.log('Centroid:', Math.round(centroid.x), Math.round(centroid.y));
-console.log('Center matches centroid:', Math.round(marma25.marmaPoints[0].x) === Math.round(centroid.x) && Math.round(marma25.marmaPoints[0].y) === Math.round(centroid.y));
+// Rotating North turns the lattice about the centroid; the centre point stays on the centroid
+const r = recalculateMetrics(square, true, 30, 'north', 'plot');
+assert.ok(Math.hypot(r.marmaSthan.marmaPoints[0].x - r.centroid.x, r.marmaSthan.marmaPoints[0].y - r.centroid.y) < 1e-6);
+console.log('  ✔ centre point stays on the centroid when North turns');

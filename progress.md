@@ -179,6 +179,15 @@ Open-source, local-first Vastu Shastra analysis web application inspired by prof
   - PDF: section 4 on page 2 lists the four rings with padas, area, share and guidance.
   - Tests: 4 new assertions (29 total). A square plot gives exactly 9/16/24/32 padas; ring areas sum to the plot for an L-shape at any rotation in both grid modes; the L-shape's cut shows as a partly filled outer ring.
 
+- [x] **Accuracy Fixes from the Validation Review** (COMPLETED, 2026-10-28) — details and evidence in [`docs/validation-2026-10-28.md`](docs/validation-2026-10-28.md)
+  - **Plot-following mandala** ([`js/mandala.js`](js/mandala.js), default; classical rectangle via the Layers switch): rings are copies of the plot scaled about the centroid; Brahma = 1/3-scale copy (exactly 1/9 of the plot); the 32 outer Devtas are 11.25° slices of the ring between the 7/9 copy and the wall, the same slices as the entrances. Matches VastuGrid's public sample report.
+  - **Marma** per Brihat Samhita 53.63–64: vamsa lines two padas off the diagonals, atimarma on squares 23 31 33 39 41 43 49 51 59; straight and centred on the centroid.
+  - Inner corner Devtas run clockwise (NE and SW pairs swapped) to match VastuGrid's numbering.
+  - New **32 gates 81 pad** layer; 16 zones and the new **Five Elements** view are clipped to the plot.
+  - Bugs fixed: Land Energy L × B now from the walls (optional typed size, borderline flag); entrances partition the wall exactly on U-shaped plans; self-crossing boundaries are flagged and paused; phone tracing no longer closes early (12 px snap, "Lift to close" badge); undo covers North and Set Scale; Brahmasthan label shows its real share of the plot.
+  - PDF: fixed-size plan picture, new page 4 with all 32 entrances (Devta, wall length, Brihat Samhita result).
+  - Tests: [`scratch/test_validation.js`](scratch/test_validation.js) (13, including VastuGrid's own sample plan) and a rewritten [`scratch/test_marma.js`](scratch/test_marma.js).
+
 ---
 
 ## Current Status
@@ -200,6 +209,7 @@ Open-source, local-first Vastu Shastra analysis web application inspired by prof
   15. 16 Direction Bar Chart (popup with Export PNG + PDF page 3)
   16. Mobile & tablet app redesign (touch, bottom sheet, compass dial, ivory & saffron, offline install, autosave, share)
   17. Vithi Mandal (4 rings with real-area shares, guidance, canvas overlay, PDF section)
+  18. Accuracy fixes: plot-following mandala, Brihat Samhita Marma, 32 gates 81 pad, clipped zones and Five Elements, five bugs
 - All features from the original wish list are built. **Awaiting user review** before anything further.
 
 

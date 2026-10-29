@@ -17,7 +17,10 @@ import {
   setGridAlign,
   setCalibrationMode,
   applyCalibration,
-  restoreProject
+  restoreProject,
+  setMandalaShape,
+  setLandDimensions,
+  commitRotationHistory
 } from './state.js';
 import { CanvasController, computeFitViewport, refreshTheme } from './canvas.js';
 import { initUI } from './ui.js';
@@ -114,7 +117,8 @@ document.addEventListener('DOMContentLoaded', () => {
     gates32: document.getElementById('toggleGates32'),
     marma: document.getElementById('toggleMarma'),
     vithi: document.getElementById('toggleVithi'),
-    elements: document.getElementById('toggleElements')
+    elements: document.getElementById('toggleElements'),
+    gatePadas: document.getElementById('toggleGatePadas')
   };
 
   // Action buttons
@@ -216,18 +220,65 @@ document.addEventListener('DOMContentLoaded', () => {
     store.setState(setRotation(normalizedDeg));
   };
 
-  rotationSlider.addEventListener('input', (e) => {
-    const val = parseFloat(e.target.value) || 0;
-    updateRotationUI(val);
-  });
-
-  rotationNumber.addEventListener('input', (e) => {
-    const val = parseFloat(e.target.value) || 0;
-    updateRotationUI(val);
+  let rotationAtStart = null;
+  const beginRotation = () => {
+    if (rotationAtStart === null) rotationAtStart = store.getState().rotation;
+  };
+  const endRotation = () => {
+    if (rotationAtStart !== null) store.setState(commitRotationHistory(rotationAtStart));
+    rotationAtStart = null;
+  };
+  [rotationSlider, rotationNumber].forEach((input) => {
+    input.addEventListener('pointerdown', beginRotation);
+    input.addEventListener('focus', beginRotation);
+    input.addEventListener('change', endRotation);
+    input.addEventListener('input', (e) => {
+      beginRotation();
+      updateRotationUI(parseFloat(e.target.value) || 0);
+    });
   });
 
   btnResetRotation.addEventListener('click', () => {
+    const before = store.getState().rotation;
     updateRotationUI(0);
+    store.setState(commitRotationHistory(before));
+  });
+
+  // Mandala shape: follow the plot outline (default) or the classical rectangle
+  const toggleMandalaPlot = document.getElementById('toggleMandalaPlot');
+  if (toggleMandalaPlot) {
+    toggleMandalaPlot.addEventListener('change', (e) => {
+      store.setState(setMandalaShape(e.target.checked ? 'plot' : 'rect'));
+    });
+  }
+
+  // Land energy: exact plot length and breadth from documents, or measured from the walls
+  const landDimsBackdrop = document.getElementById('landDimsBackdrop');
+  const landLength = document.getElementById('landLength');
+  const landBreadth = document.getElementById('landBreadth');
+  const closeLandDims = () => { landDimsBackdrop.style.display = 'none'; };
+  document.getElementById('btnEditLandDims').addEventListener('click', () => {
+    const st = store.getState();
+    const land = calculatePositiveLandEnergy(st.metrics, st.calibration, st.landDims);
+    landLength.value = st.landDims ? st.landDims.length : (land.isActive ? land.length : '');
+    landBreadth.value = st.landDims ? st.landDims.breadth : (land.isActive ? land.breadth : '');
+    landDimsBackdrop.style.display = 'flex';
+    setTimeout(() => landLength.focus(), 50);
+  });
+  document.getElementById('btnLandDimsClose').addEventListener('click', closeLandDims);
+  document.getElementById('btnLandDimsMeasured').addEventListener('click', () => {
+    store.setState(setLandDimensions(null));
+    closeLandDims();
+  });
+  document.getElementById('btnLandDimsApply').addEventListener('click', () => {
+    const length = parseFloat(landLength.value);
+    const breadth = parseFloat(landBreadth.value);
+    if (!(length > 0) || !(breadth > 0)) {
+      (length > 0 ? landBreadth : landLength).focus();
+      return;
+    }
+    store.setState(setLandDimensions({ length, breadth }));
+    closeLandDims();
   });
 
   if (toggleGridWalls) {
@@ -399,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   if (btnExportPng) {
     btnExportPng.addEventListener('click', () => {
-      exportCanvasToPng(canvasElement).then(announceExport);
+      exportCanvasToPng(canvasController.snapshot()).then(announceExport);
     });
   }
 
@@ -442,7 +493,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnPdfModalSkip) {
     btnPdfModalSkip.addEventListener('click', async () => {
       closePdfModal();
-      announceExport(await generatePdfReport(canvasElement, store.getState(), '', {}));
+      announceExport(await generatePdfReport(canvasController.snapshot(), store.getState(), '', {}));
     });
   }
 
@@ -454,7 +505,7 @@ document.addEventListener('DOMContentLoaded', () => {
         address: pdfAddress ? pdfAddress.value.trim() : ''
       };
       closePdfModal();
-      announceExport(await generatePdfReport(canvasElement, store.getState(), '', clientInfo));
+      announceExport(await generatePdfReport(canvasController.snapshot(), store.getState(), '', clientInfo));
     });
   }
 
@@ -558,7 +609,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (valBrahmaArea) {
       valBrahmaArea.textContent = areaData.gridArea > 0
-        ? `${formatArea(areaData.brahmasthanArea, cal)} (${areaData.brahmasthanRatioPct}%)`
+        ? `${formatArea(areaData.brahmasthanArea, cal)} · ${areaData.brahmasthanRatioPct}% of plot`
         : '—';
     }
     if (valPadaArea) {
@@ -583,15 +634,24 @@ document.addEventListener('DOMContentLoaded', () => {
     // Sheet summary (always visible above the dock on phones)
     const sumArea = document.getElementById('sumArea');
     const sumVerdict = document.getElementById('sumVerdict');
+    const boundaryBanner = document.getElementById('boundaryBanner');
+    const badBoundary = state.metrics.boundaryError === 'self-intersecting';
+    if (boundaryBanner) boundaryBanner.style.display = badBoundary ? 'flex' : 'none';
+    if (badBoundary && lastState.metrics.boundaryError !== 'self-intersecting') {
+      ui.showToast('The boundary crosses itself — results are paused until it is fixed');
+    }
+    if (toggleMandalaPlot && toggleMandalaPlot.checked !== (state.mandalaShape !== 'rect')) {
+      toggleMandalaPlot.checked = state.mandalaShape !== 'rect';
+    }
     if (sumArea) {
-      sumArea.textContent = areaData.hasClosedPlot
+      sumArea.textContent = badBoundary ? 'Boundary crosses itself' : areaData.hasClosedPlot
         ? formatArea(areaData.plotArea, cal)
         : (state.polygon.length > 0 ? `${state.polygon.length} corners placed` : 'Not traced yet');
     }
     if (sumVerdict) {
-      const land = calculatePositiveLandEnergy(state.metrics, cal);
+      const land = calculatePositiveLandEnergy(state.metrics, cal, state.landDims);
       const code = land.verdict.code;
-      sumVerdict.textContent = land.isActive
+      sumVerdict.textContent = badBoundary ? 'Fix boundary' : land.isActive
         ? ({ RECOMMENDED: 'Recommended', MODERATE: 'Conditional', CAUTION: 'Remedies' }[code] || '—')
         : (areaData.hasClosedPlot ? 'Set scale' : `N ${Math.round(state.rotation)}°`);
       sumVerdict.className = `summary-chip ${land.isActive ? ({ RECOMMENDED: 'is-good', MODERATE: 'is-mid', CAUTION: 'is-bad' }[code] || '') : ''}`;
@@ -632,7 +692,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isBarChartOpen()) renderBarChart(state);
 
     // Update Positive Land Energy Analysis (needs Set Scale for real dimensions)
-    const landData = calculatePositiveLandEnergy(state.metrics, cal);
+    const landData = calculatePositiveLandEnergy(state.metrics, cal, state.landDims);
+    const valLandDims = document.getElementById('valLandDims');
+    if (valLandDims) {
+      valLandDims.innerHTML = landData.isActive
+        ? `Length × breadth: <strong>${landData.length} × ${landData.breadth} ft</strong> · ${landData.source === 'typed' ? 'typed in' : 'measured from the walls'}`
+        : (state.landDims ? `Length × breadth: <strong>${state.landDims.length} × ${state.landDims.breadth} ft</strong> · typed in` : 'Length × breadth: set the scale, or type the size in');
+    }
     const landEnergyBadge = document.getElementById('landEnergyBadge');
     const valLandIncome = document.getElementById('valLandIncome');
     const valLandIncomeFormula = document.getElementById('valLandIncomeFormula');
@@ -691,7 +757,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (labelEnergyPattern) labelEnergyPattern.textContent = `Energy Pattern (Remainder: ${landData.remainder})`;
       if (iconEnergyPattern) iconEnergyPattern.textContent = landData.remainderInfo.isPositive ? '✔' : '⚠';
       if (descEnergyPattern) descEnergyPattern.textContent = `${landData.remainderInfo.quality} (${landData.remainderInfo.description})`;
-      if (calcEnergyPattern) calcEnergyPattern.textContent = `(${landData.length} + ${landData.breadth}) ÷ 8 = remainder ${landData.remainder}`;
+      if (calcEnergyPattern) {
+        calcEnergyPattern.textContent = `(${landData.length} + ${landData.breadth} = ${landData.exactSum} → ${landData.sumDimensions}) ÷ 8 = remainder ${landData.remainder}`
+          + (landData.borderline ? ` · Borderline: L + B is close to ${Math.floor(landData.exactSum) + 0.5}; a small measuring difference would give remainder ${landData.alternateRemainder}` : '');
+      }
 
       // Length Proportion (Ratio)
       if (cardLengthProportion) {

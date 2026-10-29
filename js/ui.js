@@ -3,7 +3,7 @@
  * Phones get a draggable bottom sheet; large screens show the same panel at the side.
  */
 
-import { setRotation } from './state.js';
+import { setRotation, commitRotationHistory } from './state.js';
 
 const WIDE_QUERY = '(min-width: 1024px), (min-width: 900px) and (orientation: landscape)';
 const SHEET_STATES = ['peek', 'half', 'full'];
@@ -206,6 +206,8 @@ export const initUI = (store) => {
     const finish = () => {
       if (!turn) return;
       const wasTap = !turn.moved;
+      // One undo step for the whole turn
+      if (!wasTap) store.setState(commitRotationHistory(turn.startRotation));
       turn = null;
       dial.classList.remove('is-turning');
       if (wasTap && tapOpensNorth) openPanel('north');
@@ -221,8 +223,13 @@ export const initUI = (store) => {
   bindDial(document.getElementById('compassButton'), { tapOpensNorth: true });
   bindDial(document.getElementById('northDialLarge'), { tapOpensNorth: false });
 
-  document.getElementById('btnRotateMinus')?.addEventListener('click', () => store.setState(setRotation(store.getState().rotation - 1)));
-  document.getElementById('btnRotatePlus')?.addEventListener('click', () => store.setState(setRotation(store.getState().rotation + 1)));
+  const nudge = (deg) => {
+    const before = store.getState().rotation;
+    store.setState(setRotation(before + deg));
+    store.setState(commitRotationHistory(before));
+  };
+  document.getElementById('btnRotateMinus')?.addEventListener('click', () => nudge(-1));
+  document.getElementById('btnRotatePlus')?.addEventListener('click', () => nudge(1));
 
   // ---------- Toasts ----------
   const showToast = (message, { duration = 2800 } = {}) => {

@@ -100,9 +100,11 @@ export const calculateAreaMetrics = (metrics) => {
   const width = bounds ? bounds.width : 0;
   const height = bounds ? bounds.height : 0;
   const gridArea = grid ? (grid.padWidth * 9) * (grid.padHeight * 9) : 0;
-  const padaArea = grid ? grid.padWidth * grid.padHeight : 0;
-  const brahmasthanArea = padaArea * 9;
-  const brahmasthanRatioPct = gridArea > 0 ? (brahmasthanArea / gridArea) * 100 : 11.11;
+  // A pada is 1/81 of the mandala: of the plot itself when the mandala follows the plot
+  const padaArea = grid ? (grid.shape === 'plot' ? plotArea / 81 : grid.padWidth * grid.padHeight) : 0;
+  // The Brahmasthan's real share of the plot (not of the grid rectangle)
+  const brahmasthanArea = metrics.brahmasthan ? metrics.brahmasthan.area : padaArea * 9;
+  const brahmasthanRatioPct = metrics.brahmasthan ? metrics.brahmasthan.pctOfPlot : 11.11;
 
   return {
     plotArea,
@@ -258,9 +260,9 @@ export const ENERGY_PATTERNS_DICT = {
  * @param {Object} metrics - Plot metrics
  * @param {Object} calibration - Set Scale result { realPerWorld, unit }
  */
-export const calculatePositiveLandEnergy = (metrics, calibration = null) => {
+export const calculatePositiveLandEnergy = (metrics, calibration = null, landDims = null) => {
   const hasPlot = !!(metrics && metrics.bounds && metrics.area > 0);
-  if (!hasPlot || !calibration) {
+  if (!hasPlot || (!calibration && !landDims)) {
     return {
       isActive: false,
       length: 0,
@@ -291,17 +293,23 @@ export const calculatePositiveLandEnergy = (metrics, calibration = null) => {
     };
   }
 
-  // Use oriented bounding dimensions after rotation
-  const rawW = metrics.grid9x9 ? metrics.grid9x9.totalWidth : metrics.bounds.width;
-  const rawH = metrics.grid9x9 ? metrics.grid9x9.totalHeight : metrics.bounds.height;
-
-  const rawL = Math.max(rawW, rawH);
-  const rawB = Math.min(rawW, rawH);
-
-  // Convert canvas units to real feet using the Set Scale calibration
-  const feetPerWorld = calibration.realPerWorld * (calibration.unit === 'm' ? FEET_PER_METRE : 1);
-  const length = Math.round(rawL * feetPerWorld * 10) / 10;
-  const breadth = Math.max(0.1, Math.round(rawB * feetPerWorld * 10) / 10);
+  // Length and breadth of the plot's own walls (independent of North), or as typed by the user
+  let lengthFt;
+  let breadthFt;
+  let source;
+  if (landDims) {
+    lengthFt = landDims.length;
+    breadthFt = landDims.breadth;
+    source = 'typed';
+  } else {
+    const dims = metrics.plotDims || { length: Math.max(metrics.bounds.width, metrics.bounds.height), breadth: Math.min(metrics.bounds.width, metrics.bounds.height) };
+    const feetPerWorld = calibration.realPerWorld * (calibration.unit === 'm' ? FEET_PER_METRE : 1);
+    lengthFt = dims.length * feetPerWorld;
+    breadthFt = dims.breadth * feetPerWorld;
+    source = 'measured';
+  }
+  const length = Math.round(lengthFt * 10) / 10;
+  const breadth = Math.max(0.1, Math.round(breadthFt * 10) / 10);
 
   // 1. Income Potential: Length × 8
   const income = Math.round(length * 8 * 100) / 100;
@@ -315,6 +323,12 @@ export const calculatePositiveLandEnergy = (metrics, calibration = null) => {
   // 4. Energy Pattern (Remainder method): (Length + Breadth) ÷ 8 → remainder
   const sumDimensions = Math.round(length + breadth);
   const remainder = sumDimensions % 8;
+  // Borderline when a small tracing difference (under 0.3 ft) would round L + B the other way
+  const exactSum = length + breadth;
+  const toBoundary = Math.abs(exactSum - (Math.floor(exactSum) + 0.5));
+  const borderline = toBoundary < 0.3;
+  const otherSum = exactSum >= Math.floor(exactSum) + 0.5 ? sumDimensions - 1 : sumDimensions + 1;
+  const alternateRemainder = borderline ? ((otherSum % 8) + 8) % 8 : null;
   const remainderInfo = ENERGY_PATTERNS_DICT[remainder] || ENERGY_PATTERNS_DICT[0];
 
   // 5. Length Proportion (Ratio): Length / Breadth
@@ -360,6 +374,10 @@ export const calculatePositiveLandEnergy = (metrics, calibration = null) => {
     remainder,
     remainderInfo,
     sumDimensions,
+    exactSum: Math.round(exactSum * 100) / 100,
+    borderline,
+    alternateRemainder,
+    source,
     ratio,
     maxAllowedLength,
     ratioGood,

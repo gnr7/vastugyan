@@ -89,6 +89,11 @@
           <button class="chip-btn chip-btn-solid" id="btnFinishDraft">Done</button>
         </div>
 
+        <div class="stage-banner stage-banner-alert" id="boundaryBanner" style="display: none;" role="alert">
+          <span class="banner-dot banner-dot-alert"></span>
+          <span class="banner-text">The boundary crosses itself. Drag a corner so the red edges no longer cross, or undo.</span>
+        </div>
+
         <div class="stage-banner" id="scaleBanner" style="display: none;" role="status">
           <span class="banner-dot banner-dot-brass"></span>
           <span class="banner-text">Mark both ends of a wall whose real length you know</span>
@@ -169,6 +174,16 @@
           <!-- LAYERS -->
           <section class="panel-section" data-panel="layers">
             <h2 class="section-heading">Overlays</h2>
+            <label class="switch-row switch-row-top">
+              <span class="switch-text">
+                <span class="switch-label">Mandala follows the plot outline</span>
+                <span class="switch-sub">On: rings are copies of your plot, Brahmasthan is exactly 1/9 of it. Off: classical rectangle around the plot.</span>
+              </span>
+              <span class="switch">
+                <input type="checkbox" id="toggleMandalaPlot" checked>
+                <span class="switch-track"></span>
+              </span>
+            </label>
             <div class="layer-grid">
               <label class="layer-tile">
                 <input type="checkbox" id="toggleGrid9x9" checked>
@@ -216,6 +231,14 @@
                   <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14"/><path d="M9 2v3M12 2v3M15 2v3M9 19v3M12 19v3M15 19v3M2 9h3M2 12h3M2 15h3M19 9h3M19 12h3M19 15h3"/></svg>
                   <span class="layer-name">32 entrances</span>
                   <span class="layer-sub">N1–N8 … W1–W8</span>
+                </span>
+              </label>
+              <label class="layer-tile">
+                <input type="checkbox" id="toggleGatePadas">
+                <span class="layer-body">
+                  <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18"/><rect x="7" y="7" width="10" height="10"/><path d="M3 9l4 2M3 15l4-2M21 9l-4 2M21 15l-4-2M9 3l2 4M15 3l-2 4M9 21l2-4M15 21l-2-4"/></svg>
+                  <span class="layer-name">32 gates 81 pad</span>
+                  <span class="layer-sub">Outer padas, coded</span>
                 </span>
               </label>
               <label class="layer-tile">
@@ -269,6 +292,10 @@
             <div class="scale-status" id="valScale">Scale not set — use Set Scale for real feet / metres</div>
 
             <h2 class="section-heading">Land energy <span class="badge-value" id="landEnergyBadge">No Plot</span></h2>
+            <div class="dims-row">
+              <span class="dims-text" id="valLandDims">Length × breadth: not measured yet</span>
+              <button class="chip-btn" id="btnEditLandDims">Edit</button>
+            </div>
             <div class="energy-metrics-grid">
               <div class="energy-card card-income">
                 <span class="energy-card-title">Income potential</span>
@@ -508,6 +535,30 @@
       <div class="modal-footer">
         <button id="btnBarChartPng" class="btn btn-secondary">Save chart image</button>
         <button id="btnBarChartDone" class="btn btn-primary">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Land dimensions -->
+  <div id="landDimsBackdrop" class="modal-backdrop" style="display: none;">
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="landDimsTitle">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="landDimsTitle">Plot length and breadth</h3>
+          <p class="modal-subtitle">Use the exact size from the plot documents. Leave it measured from the walls otherwise.</p>
+        </div>
+        <button id="btnLandDimsClose" class="icon-btn" aria-label="Close"><svg class="icon"><use href="#i-close"/></svg></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label" for="landLength">Length (feet)</label>
+        <input type="number" id="landLength" class="form-input" min="0" step="0.01" inputmode="decimal" placeholder="41">
+        <label class="form-label" for="landBreadth">Breadth (feet)</label>
+        <input type="number" id="landBreadth" class="form-input" min="0" step="0.01" inputmode="decimal" placeholder="30.83">
+        <p class="scale-status">Feet and inches: 30′10″ is 30.83 ft.</p>
+      </div>
+      <div class="modal-footer">
+        <button id="btnLandDimsMeasured" class="btn btn-secondary">Use measured</button>
+        <button id="btnLandDimsApply" class="btn btn-primary">Use these</button>
       </div>
     </div>
   </div>

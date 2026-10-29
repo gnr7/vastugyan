@@ -4,7 +4,7 @@
  * cache-first for Google Fonts. Bump CACHE_VERSION when the file list changes.
  */
 
-const CACHE_VERSION = 'vms-v1';
+const CACHE_VERSION = 'vms-v2';
 const FONT_CACHE = 'vms-fonts-v1';
 
 const APP_SHELL = [
@@ -23,6 +23,7 @@ const APP_SHELL = [
   'js/barchart.js',
   'js/export.js',
   'js/persist.js',
+  'js/mandala.js',
   'js/vendor/jspdf.umd.min.js',
   'icons/icon-192.png',
   'icons/icon-512.png',
