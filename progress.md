@@ -211,6 +211,8 @@ Open-source, local-first Vastu Shastra analysis web application inspired by prof
   17. Vithi Mandal (4 rings with real-area shares, guidance, canvas overlay, PDF section)
   18. Accuracy fixes: plot-following mandala, Brihat Samhita Marma, 32 gates 81 pad, clipped zones and Five Elements, five bugs
   19. Renamed to **Vastu Gyan**; responsive fixes (plan refits on rotation/resize, side panel on landscape phones, all panel tabs visible on small screens); WhatsApp/SMS link preview; published on Vercel (only the app files, via `.vercelignore`)
+  20. Compass wheel layer (16-zone ring around the plot with the North line and angle), Five elements style setting (Classic as VastuGrid, or Loose Earth for NE and NW with Hard Earth SSW and SW) carried into Analysis, the 16 bar chart and the PDF, and element labels that always show
+  21. Smaller PDF reports: compressed PDF, PNG plan for traced plans and JPEG (90%) over a floor plan photo; about 13 MB down to 0.4–0.6 MB
 - All features from the original wish list are built. **Awaiting user review** before anything further.
 
 

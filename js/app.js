@@ -19,9 +19,11 @@ import {
   applyCalibration,
   restoreProject,
   setMandalaShape,
+  setElementStyle,
   setLandDimensions,
   commitRotationHistory
 } from './state.js';
+import { ELEMENT_STYLES } from './zones.js';
 import { CanvasController, computeFitViewport, refreshTheme } from './canvas.js';
 import { initUI } from './ui.js';
 import {
@@ -118,6 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
     marma: document.getElementById('toggleMarma'),
     vithi: document.getElementById('toggleVithi'),
     elements: document.getElementById('toggleElements'),
+    compassWheel: document.getElementById('toggleCompassWheel'),
     gatePadas: document.getElementById('toggleGatePadas')
   };
 
@@ -326,7 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // 5c. 16 Bar Chart popup (redrawn live from the store while open)
   const isBarChartOpen = () => barChartBackdrop && barChartBackdrop.style.display === 'flex';
   const renderBarChart = (state) => {
-    const chart = calculate16BarChart(state.metrics.zones16);
+    const chart = calculate16BarChart(state.metrics.zones16, state.elementStyle);
     draw16BarChart(barChartCanvas, chart);
     const cal = state.calibration;
     document.getElementById('barStatTotal').textContent = chart.hasData ? formatArea(chart.totalArea, cal) : '—';
@@ -363,11 +366,25 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 6. Layer Toggles Event Binding
+  let elementsTipShown = false;
   Object.entries(toggles).forEach(([layerKey, checkbox]) => {
     if (!checkbox) return;
     checkbox.addEventListener('change', (e) => {
       store.setState(toggleLayer(layerKey, e.target.checked));
+      const { layers } = store.getState();
+      // The wheel sits outside the plot, so make room for it (and give the room back)
+      if (layerKey === 'compassWheel') canvasController.fitToView();
+      if ((layerKey === 'elements' || layerKey === 'compassWheel') && e.target.checked && !elementsTipShown && (layers.devtas45 || layers.devtaNames)) {
+        elementsTipShown = true;
+        ui.showToast('Tip: switch off Devtas for a clearer elements view', { duration: 4200 });
+      }
     });
+  });
+
+  // Five elements style: Classic (as VastuGrid) or Loose Earth for NE and NW
+  const elementStyleButtons = document.querySelectorAll('[data-element-style]');
+  elementStyleButtons.forEach((btn) => {
+    btn.addEventListener('click', () => store.setState(setElementStyle(btn.dataset.elementStyle)));
   });
 
   // 7. Draw Boundary Toggle Button
@@ -640,6 +657,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (badBoundary && lastState.metrics.boundaryError !== 'self-intersecting') {
       ui.showToast('The boundary crosses itself — results are paused until it is fixed');
     }
+    elementStyleButtons.forEach((btn) => {
+      btn.setAttribute('aria-checked', String(btn.dataset.elementStyle === state.elementStyle));
+    });
+    const elementStyleNote = document.getElementById('elementStyleNote');
+    if (elementStyleNote) elementStyleNote.textContent = ELEMENT_STYLES[state.elementStyle].note;
     if (toggleMandalaPlot && toggleMandalaPlot.checked !== (state.mandalaShape !== 'rect')) {
       toggleMandalaPlot.checked = state.mandalaShape !== 'rect';
     }
@@ -670,7 +692,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Update Panch Tatva balance from the real plot area in each element's zones
-    calculatePanchTatvaSummary(state.metrics.zones16).forEach((elem) => {
+    const tatva = calculatePanchTatvaSummary(state.metrics.zones16, state.elementStyle);
+    tatva.forEach((elem) => {
       const segment = document.querySelector(`[data-element="${elem.id}"]`);
       const pct = document.querySelector(`[data-element-pct="${elem.id}"]`);
       const zonesLabel = document.querySelector(`[data-element-zones="${elem.id}"]`);
@@ -682,9 +705,23 @@ document.addEventListener('DOMContentLoaded', () => {
       if (pct) pct.textContent = elem.formattedPercentage;
       if (zonesLabel) zonesLabel.textContent = elem.zones.join(', ');
     });
+    const earth = tatva.find((elem) => elem.id === 'earth');
+    const earthSplit = document.getElementById('earthSplit');
+    if (earthSplit) {
+      earthSplit.hidden = !earth.earthSplit;
+      if (earth.earthSplit) {
+        earthSplit.textContent = earth.hasData
+          ? `Earth: hard ${earth.earthSplit.hard}% (SSW, SW) · loose ${earth.earthSplit.loose}% (NE, NW)`
+          : 'Earth: hard (SSW, SW) · loose (NE, NW)';
+      }
+    }
+    const elementStyleStatus = document.getElementById('elementStyleStatus');
+    if (elementStyleStatus) {
+      elementStyleStatus.textContent = `Share of the plot's area in each element's zones · ${ELEMENT_STYLES[state.elementStyle].label} style`;
+    }
 
     // 16 Bar Chart button needs a closed plot; keep the popup live while it is open
-    const hasZoneAreas = calculate16BarChart(state.metrics.zones16).hasData;
+    const hasZoneAreas = calculate16BarChart(state.metrics.zones16, state.elementStyle).hasData;
     if (btnOpenBarChart) {
       btnOpenBarChart.disabled = !hasZoneAreas;
       btnOpenBarChart.title = hasZoneAreas ? 'Area share of each of the 16 directions' : 'Close the plot boundary first';

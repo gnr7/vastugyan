@@ -275,6 +275,24 @@
                   <span class="layer-sub">Element colours</span>
                 </span>
               </label>
+              <label class="layer-tile">
+                <input type="checkbox" id="toggleCompassWheel">
+                <span class="layer-body">
+                  <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/><path d="M12 8.5v7" class="glyph-north"/></svg>
+                  <span class="layer-name">Compass wheel</span>
+                  <span class="layer-sub">Zones ring + North</span>
+                </span>
+              </label>
+            </div>
+            <div class="style-row">
+              <span class="switch-text">
+                <span class="switch-label">Five elements style</span>
+                <span class="switch-sub" id="elementStyleNote">NE is Water and NW is Space (as VastuGrid)</span>
+              </span>
+              <div class="seg-control" role="radiogroup" aria-label="Five elements style">
+                <button type="button" role="radio" data-element-style="classic" aria-checked="true">Classic</button>
+                <button type="button" role="radio" data-element-style="looseEarth" aria-checked="false">Loose earth</button>
+              </div>
             </div>
           </section>
 
@@ -365,7 +383,8 @@
               <div class="elemental-row"><span class="elem-label"><span class="elem-dot dot-earth"></span><span class="elem-name">Earth · Prithvi</span></span><span class="elem-zones" data-element-zones="earth">—</span><span class="elem-pct" data-element-pct="earth">—</span></div>
               <div class="elemental-row"><span class="elem-label"><span class="elem-dot dot-space"></span><span class="elem-name">Space · Akash</span></span><span class="elem-zones" data-element-zones="space">—</span><span class="elem-pct" data-element-pct="space">—</span></div>
             </div>
-            <p class="scale-status">Share of the plot's area in each element's zones</p>
+            <p class="scale-status" id="earthSplit" hidden></p>
+            <p class="scale-status" id="elementStyleStatus">Share of the plot's area in each element's zones</p>
             <button id="btnOpenBarChart" class="btn btn-secondary btn-block" disabled title="Close the plot boundary first">
               <svg class="icon"><use href="#i-bars"/></svg>View 16 bar chart
             </button>

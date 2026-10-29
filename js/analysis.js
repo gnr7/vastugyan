@@ -3,10 +3,17 @@
  * Pure functional calculations for area proportions, Panch Tatva balance, and entrances.
  */
 
-import { ZONES_16_DATA } from './zones.js';
+import { ZONES_16_DATA, zoneElement, zoneTone } from './zones.js';
 
 const ELEMENT_IDS = { Water: 'water', Air: 'air', Fire: 'fire', Earth: 'earth', Space: 'space' };
-const zonesOfElement = (id) => ZONES_16_DATA.filter((z) => ELEMENT_IDS[z.element] === id).map((z) => z.id);
+const zonesOfElement = (id, style = 'classic') => ZONES_16_DATA.filter((z) => ELEMENT_IDS[zoneElement(z.id, style)] === id).map((z) => z.id);
+
+// Direction ranges that change with the Loose Earth style
+const LOOSE_EARTH_RANGES = {
+  water: 'North-North-West to North-North-East',
+  earth: 'South-South-West to South-West (hard), North-East and North-West (loose)',
+  space: 'West-South-West to West-North-West'
+};
 
 export const FEET_PER_METRE = 3.28084;
 
@@ -123,20 +130,31 @@ export const calculateAreaMetrics = (metrics) => {
  * Shares are the real plot area falling in each element's zones (needs a closed plot).
  * @param {Object} zones16 - Zones with per-zone `area` from calculateZoneAreas
  */
-export const calculatePanchTatvaSummary = (zones16 = null) => {
+export const calculatePanchTatvaSummary = (zones16 = null, style = 'classic') => {
   const zones = zones16 && zones16.zones ? zones16.zones : [];
   const hasAreas = zones.length > 0 && zones.every((z) => typeof z.area === 'number');
   const totalArea = hasAreas ? zones.reduce((sum, z) => sum + z.area, 0) : 0;
+  const pctOf = (area) => (totalArea > 0 ? Math.round((area / totalArea) * 1000) / 10 : 0);
+  const areaOf = (ids) => (hasAreas ? zones.filter((z) => ids.includes(z.id)).reduce((sum, z) => sum + z.area, 0) : 0);
 
   return PANCH_TATVA_DATA.map((elem) => {
-    const area = hasAreas
-      ? zones.filter((z) => elem.zones.includes(z.id)).reduce((sum, z) => sum + z.area, 0)
-      : 0;
-    const percentage = totalArea > 0 ? Math.round((area / totalArea) * 1000) / 10 : 0;
+    const elemZones = zonesOfElement(elem.id, style);
+    const area = areaOf(elemZones);
+    const percentage = pctOf(area);
+    // With Loose Earth, Earth's share is split into its hard (SSW, SW) and loose (NE, NW) parts
+    const earthSplit = style === 'looseEarth' && elem.id === 'earth'
+      ? {
+        hard: pctOf(areaOf(elemZones.filter((id) => zoneTone(id, style) === 'HardEarth'))),
+        loose: pctOf(areaOf(elemZones.filter((id) => zoneTone(id, style) === 'LooseEarth')))
+      }
+      : null;
     return {
       ...elem,
-      zoneCount: elem.zones.length,
+      zones: elemZones,
+      directionRange: style === 'looseEarth' && LOOSE_EARTH_RANGES[elem.id] ? LOOSE_EARTH_RANGES[elem.id] : elem.directionRange,
+      zoneCount: elemZones.length,
       area,
+      earthSplit,
       hasData: totalArea > 0,
       percentage,
       formattedPercentage: totalArea > 0 ? `${percentage}%` : '—'
@@ -158,7 +176,7 @@ export const BAR_BANDS = {
  * is what changes with the plot's shape.
  * @param {Object} zones16 - Zones with per-zone `area` from calculateZoneAreas
  */
-export const calculate16BarChart = (zones16 = null) => {
+export const calculate16BarChart = (zones16 = null, style = 'classic') => {
   const zones = zones16 && zones16.zones ? zones16.zones : [];
   const totalArea = zones.reduce((sum, z) => sum + (typeof z.area === 'number' ? z.area : 0), 0);
   if (zones.length !== 16 || !(totalArea > 0)) {
@@ -176,7 +194,9 @@ export const calculate16BarChart = (zones16 = null) => {
     if (pct > mean + sd + eps) band = 'high';
     else if (pct < mean - sd - eps) band = 'low';
     else band = pct >= mean ? 'above' : 'below';
-    return { id: z.id, name: z.name, element: z.element, area: z.area, pct, band, color: BAR_BANDS[band].color };
+    const tone = zoneTone(z.id, style);
+    const element = tone === 'LooseEarth' ? 'Loose Earth' : tone === 'HardEarth' ? 'Hard Earth' : z.element;
+    return { id: z.id, name: z.name, element, area: z.area, pct, band, color: BAR_BANDS[band].color };
   });
 
   const max = bars.reduce((best, b) => (b.pct > best.pct ? b : best), bars[0]);

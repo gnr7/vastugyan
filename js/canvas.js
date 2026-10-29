@@ -3,7 +3,7 @@
  */
 
 import { distance, findClosestVertex, rayPolygonHit } from './geometry.js';
-import { AUSPICIOUS_ENTRANCES } from './zones.js';
+import { AUSPICIOUS_ENTRANCES, zoneTone } from './zones.js';
 import {
   addPolygonVertex,
   closePolygon,
@@ -557,14 +557,16 @@ const ELEMENT_STYLE = {
   Air: { color: '#3E8E5E', fill: 'rgba(62, 142, 94, 0.22)', label: 'Air area' },
   Fire: { color: '#C2412B', fill: 'rgba(194, 65, 43, 0.20)', label: 'Fire area' },
   Earth: { color: '#B8862B', fill: 'rgba(184, 134, 43, 0.24)', label: 'Earth area' },
-  Space: { color: '#7D7590', fill: 'rgba(125, 117, 144, 0.22)', label: 'Space area' }
+  Space: { color: '#7D7590', fill: 'rgba(125, 117, 144, 0.22)', label: 'Space area' },
+  HardEarth: { color: '#A87A12', fill: 'rgba(222, 178, 40, 0.30)', label: 'Hard earth' },
+  LooseEarth: { color: '#97804A', fill: 'rgba(238, 220, 160, 0.42)', label: 'Loose earth' }
 };
 
 const drawPill = (ctx, text, x, y, fontWorld, scale, color, place) => {
   ctx.font = `600 ${fontWorld}px 'Hanken Grotesk', sans-serif`;
   const w = ctx.measureText(text).width + 8 / scale;
   const h = fontWorld + 4 / scale;
-  if (place && !place(x, y, w, h)) return;
+  if (place && !place(x, y, w, h)) return false;
   ctx.fillStyle = 'rgba(255, 252, 246, 0.94)';
   ctx.fillRect(x - w / 2, y - h / 2, w, h);
   ctx.strokeStyle = color;
@@ -574,11 +576,12 @@ const drawPill = (ctx, text, x, y, fontWorld, scale, color, place) => {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(text, x, y);
+  return true;
 };
 
 // Render the 16 directional zones and/or the Five Elements view.
 // With a closed plot both are clipped to it: rays end on the walls and labels sit inside.
-export const draw16Zones = (ctx, zones16, scale, layers, plot = null) => {
+export const draw16Zones = (ctx, zones16, scale, layers, plot = null, style = 'classic') => {
   if (!zones16 || !zones16.zones || zones16.zones.length === 0) return;
   if (!layers.zones16 && !layers.elements) return;
   const { centroid, radius, zones } = zones16;
@@ -597,6 +600,7 @@ export const draw16Zones = (ctx, zones16, scale, layers, plot = null) => {
     ctx.arc(centroid.x, centroid.y, reach, startRad, endRad, false);
     ctx.closePath();
   };
+  const toneOf = (z) => zoneTone(z.id, style) || z.element;
 
   ctx.save();
   if (closed) {
@@ -609,7 +613,7 @@ export const draw16Zones = (ctx, zones16, scale, layers, plot = null) => {
   if (layers.elements) {
     zones.forEach((z) => {
       wedge(z.startRad, z.endRad);
-      ctx.fillStyle = ELEMENT_STYLE[z.element].fill;
+      ctx.fillStyle = ELEMENT_STYLE[toneOf(z)].fill;
       ctx.fill();
     });
   } else {
@@ -624,7 +628,7 @@ export const draw16Zones = (ctx, zones16, scale, layers, plot = null) => {
   ctx.beginPath();
   zones.forEach((z, i) => {
     const prev = zones[(i + zones.length - 1) % zones.length];
-    if (!layers.zones16 && prev.element === z.element) return;
+    if (!layers.zones16 && toneOf(prev) === toneOf(z)) return;
     ctx.moveTo(centroid.x, centroid.y);
     ctx.lineTo(centroid.x + Math.cos(z.startRad) * reach, centroid.y + Math.sin(z.startRad) * reach);
   });
@@ -645,31 +649,155 @@ export const draw16Zones = (ctx, zones16, scale, layers, plot = null) => {
     ctx.restore();
   }
 
-  // Labels inside the plot along each zone's middle direction
+  // Labels inside the plot. Element names go first so they always find room: when their
+  // spot is taken they slide along their own direction rather than disappear.
   ctx.save();
+  if (layers.elements) {
+    const groups = [];
+    zones.forEach((z) => {
+      const last = groups[groups.length - 1];
+      if (last && last.tone === toneOf(z)) last.zones.push(z);
+      else groups.push({ tone: toneOf(z), zones: [z] });
+    });
+    if (groups.length > 1 && groups[0].tone === groups[groups.length - 1].tone) {
+      groups[0].zones = groups.pop().zones.concat(groups[0].zones);
+    }
+    groups.forEach((g) => {
+      const mid = g.zones[Math.floor(g.zones.length / 2)];
+      const rad = g.zones.length % 2 ? mid.centerRad : mid.startRad;
+      const wall = hitDistance(rad);
+      const look = ELEMENT_STYLE[g.tone];
+      const spot = (f) => [centroid.x + Math.cos(rad) * wall * f, centroid.y + Math.sin(rad) * wall * f];
+      const placed = [0.5, 0.36, 0.64, 0.24, 0.76].some((f) => drawPill(ctx, look.label, ...spot(f), fontWorld * 1.1, scale, look.color, place));
+      if (!placed) drawPill(ctx, look.label, ...spot(0.5), fontWorld * 1.1, scale, look.color, null);
+    });
+  }
   if (layers.zones16) {
     zones.forEach((z) => {
       const d = hitDistance(z.centerRad) * (closed ? 0.78 : 0.92);
       drawPill(ctx, z.short, centroid.x + Math.cos(z.centerRad) * d, centroid.y + Math.sin(z.centerRad) * d, fontWorld, scale, z.color, place);
     });
   }
-  if (layers.elements) {
-    const groups = [];
-    zones.forEach((z) => {
-      const last = groups[groups.length - 1];
-      if (last && last.element === z.element) last.zones.push(z);
-      else groups.push({ element: z.element, zones: [z] });
-    });
-    if (groups.length > 1 && groups[0].element === groups[groups.length - 1].element) {
-      groups[0].zones = groups.pop().zones.concat(groups[0].zones);
+  ctx.restore();
+};
+
+// Compass wheel: a ring just outside the plot, as practitioners draw it on paper, so the plan
+// itself stays clear. Its size depends only on the plot, so fitting the view can allow for it.
+export const compassWheelRadii = (plot, centroid) => {
+  const far = Math.max(...plot.map((p) => distance(p, centroid)));
+  const inner = far * 1.08;
+  return { inner, outer: inner + far * 0.2 };
+};
+
+const WHEEL_STYLE = {
+  Water: { fill: '#2F6DB0', text: '#FFFFFF' },
+  Air: { fill: '#3E8E5E', text: '#FFFFFF' },
+  Fire: { fill: '#A8322A', text: '#FFFFFF' },
+  Earth: { fill: '#D7A531', text: '#3A2A10' },
+  HardEarth: { fill: '#E6C02E', text: '#3A2A10' },
+  LooseEarth: { fill: '#F4EAC0', text: '#5A4520' },
+  Space: { fill: '#A7A1B3', text: '#FFFFFF' }
+};
+
+export const drawCompassWheel = (ctx, zones16, scale, plot, style = 'classic', rotationDeg = 0) => {
+  if (!zones16 || !zones16.zones || zones16.zones.length !== 16 || !plot || plot.length < 3) return;
+  const { centroid, zones } = zones16;
+  const { inner, outer } = compassWheelRadii(plot, centroid);
+  const at = (rad, r) => ({ x: centroid.x + Math.cos(rad) * r, y: centroid.y + Math.sin(rad) * r });
+
+  ctx.save();
+
+  // Spokes from the walls out to the ring, on every zone boundary
+  ctx.beginPath();
+  zones.forEach((z) => {
+    const dir = { x: Math.cos(z.startRad), y: Math.sin(z.startRad) };
+    const hit = rayPolygonHit(plot, centroid, dir);
+    const from = at(z.startRad, hit ? hit.dist : 0);
+    const to = at(z.startRad, inner);
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+  });
+  ctx.strokeStyle = 'rgba(42, 31, 23, 0.4)';
+  ctx.lineWidth = 1 / scale;
+  ctx.stroke();
+
+  // Ring sectors in element colours, with white seams
+  zones.forEach((z) => {
+    const look = WHEEL_STYLE[zoneTone(z.id, style) || z.element];
+    ctx.beginPath();
+    ctx.arc(centroid.x, centroid.y, outer, z.startRad, z.endRad, false);
+    ctx.arc(centroid.x, centroid.y, inner, z.endRad, z.startRad, true);
+    ctx.closePath();
+    ctx.fillStyle = look.fill;
+    ctx.fill();
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 1.5 / scale;
+    ctx.stroke();
+  });
+  ctx.beginPath();
+  ctx.arc(centroid.x, centroid.y, outer, 0, Math.PI * 2);
+  ctx.moveTo(centroid.x + inner, centroid.y);
+  ctx.arc(centroid.x, centroid.y, inner, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(42, 31, 23, 0.45)';
+  ctx.lineWidth = 1 / scale;
+  ctx.stroke();
+
+  // Zone names along the ring, turned so they never read upside down
+  const mid = (inner + outer) / 2;
+  const fontWorld = (outer - inner) * 0.42;
+  ctx.font = `400 ${fontWorld}px 'Marcellus', serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  zones.forEach((z) => {
+    const p = at(z.centerRad, mid);
+    const bottomHalf = Math.sin(z.centerRad) > 0.0001;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(z.centerRad + (bottomHalf ? -Math.PI / 2 : Math.PI / 2));
+    ctx.fillStyle = WHEEL_STYLE[zoneTone(z.id, style) || z.element].text;
+    ctx.fillText(z.short, 0, 0);
+    ctx.restore();
+  });
+
+  // North line through the centre, with the angle it makes with the top of the plan
+  const north = zones.find((z) => z.id === 'N');
+  if (north) {
+    const nRad = north.centerRad;
+    const tail = at(nRad + Math.PI, inner);
+    const head = at(nRad, inner); // stops at the ring so the N label stays readable
+    ctx.beginPath();
+    ctx.moveTo(tail.x, tail.y);
+    ctx.lineTo(head.x, head.y);
+    ctx.strokeStyle = THEME.kumkum;
+    ctx.lineWidth = 2.2 / scale;
+    ctx.stroke();
+
+    const up = -Math.PI / 2;
+    let turn = nRad - up;
+    while (turn > Math.PI) turn -= Math.PI * 2;
+    while (turn <= -Math.PI) turn += Math.PI * 2;
+    const deg = Math.round((((rotationDeg % 360) + 360) % 360) * 10) / 10;
+    if (Math.abs(turn) > 0.004) {
+      const r = inner * 0.9;
+      const top = at(up, r * 0.82);
+      const topEnd = at(up, inner);
+      ctx.beginPath();
+      ctx.moveTo(top.x, top.y);
+      ctx.lineTo(topEnd.x, topEnd.y);
+      ctx.setLineDash([4 / scale, 3 / scale]);
+      ctx.lineWidth = 1.2 / scale;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(centroid.x, centroid.y, r, up, nRad, turn < 0);
+      ctx.lineWidth = 1.6 / scale;
+      ctx.stroke();
     }
-    groups.forEach((g) => {
-      const mid = g.zones[Math.floor(g.zones.length / 2)];
-      const rad = g.zones.length % 2 ? mid.centerRad : mid.startRad;
-      const d = hitDistance(rad) * 0.5;
-      drawPill(ctx, ELEMENT_STYLE[g.element].label, centroid.x + Math.cos(rad) * d, centroid.y + Math.sin(rad) * d, fontWorld * 1.1, scale, ELEMENT_STYLE[g.element].color, place);
-    });
+    const labelAt = at(up + turn / 2, inner * (Math.abs(turn) > 0.004 ? 0.8 : 0.9));
+    const pillFont = Math.max(10, Math.min(14, 12 / Math.sqrt(scale))) / scale;
+    drawPill(ctx, `N ${deg}°`, labelAt.x, labelAt.y, pillFont, scale, THEME.kumkum, null);
   }
+
   ctx.restore();
 };
 
@@ -909,6 +1037,19 @@ export const drawCalibration = (ctx, state) => {
     ctx.stroke();
   });
   ctx.restore();
+};
+
+// Grow a content box so the compass wheel, when shown, fits on screen and in exports
+const withWheelRoom = (state, box) => {
+  const zones16 = state.metrics.zones16;
+  if (!state.layers.compassWheel || !state.isPolygonClosed || !zones16 || !zones16.centroid) return box;
+  const { outer } = compassWheelRadii(state.polygon, zones16.centroid);
+  const c = zones16.centroid;
+  const minX = Math.min(box.originX, c.x - outer);
+  const minY = Math.min(box.originY, c.y - outer);
+  const maxX = Math.max(box.originX + box.contentW, c.x + outer);
+  const maxY = Math.max(box.originY + box.contentH, c.y + outer);
+  return { originX: minX, originY: minY, contentW: maxX - minX, contentH: maxY - minY };
 };
 
 export class CanvasController {
@@ -1511,6 +1652,8 @@ export class CanvasController {
       originY = state.metrics.bounds.minY;
     }
 
+    ({ originX, originY, contentW, contentH } = withWheelRoom(state, { originX, originY, contentW, contentH }));
+
     // Keep the plan clear of overlays that sit on top of the canvas (phone dock and sheet)
     const insetBottom = typeof this.getBottomInset === 'function' ? this.getBottomInset() : 0;
     const fit = computeFitViewport(contentW, contentH, this.width, Math.max(120, this.height - insetBottom), 40);
@@ -1555,6 +1698,7 @@ export class CanvasController {
       contentW = b.width || 800;
       contentH = b.height || 600;
     }
+    ({ originX, originY, contentW, contentH } = withWheelRoom(state, { originX, originY, contentW, contentH }));
     const fit = computeFitViewport(contentW, contentH, width, height, 50);
     const viewport = { ...state.viewport, scale: fit.scale, x: fit.x - originX * fit.scale, y: fit.y - originY * fit.scale };
     try {
@@ -1593,7 +1737,7 @@ export class CanvasController {
 
     // 5. Render 16 Directional Zones Overlay (Sector fills, 22.5° rays, zone labels)
     if (state.metrics.zones16) {
-      draw16Zones(ctx, state.metrics.zones16, state.viewport.scale, state.layers, state.isPolygonClosed ? state.polygon : null);
+      draw16Zones(ctx, state.metrics.zones16, state.viewport.scale, state.layers, state.isPolygonClosed ? state.polygon : null, state.elementStyle);
     }
 
     // 5b. Vithi Mandal rings (under the grid lines)
@@ -1620,6 +1764,11 @@ export class CanvasController {
     // 9. Render Marma Sthan (Diagonal Energy Lines & Intersection Nodes)
     if (state.metrics.marmaSthan) {
       drawMarmaSthan(ctx, state.metrics.marmaSthan, state.viewport.scale, state.layers);
+    }
+
+    // 9b. Compass wheel around the plot, with the North line
+    if (state.layers.compassWheel && state.isPolygonClosed && state.metrics.zones16) {
+      drawCompassWheel(ctx, state.metrics.zones16, state.viewport.scale, state.polygon, state.elementStyle, state.rotation);
     }
 
     // 10. Render property boundary polygon & vertex handles

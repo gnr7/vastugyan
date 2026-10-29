@@ -29,6 +29,31 @@ export const ZONES_16_DATA = [
   { id: 'NNW', name: 'North-North-West', short: 'NNW', centerDeg: 337.5, element: 'Water', color: '#1a73e8', bgTint: 'rgba(26, 115, 232, 0.08)', attribute: 'Sex & Attraction' }
 ];
 
+// The two Five Elements conventions practitioners use. 'classic' follows VastuGrid (NE is Water,
+// NW is Space); 'looseEarth' (Applied Vastu and others) treats NE and NW, where two elements meet,
+// as Loose Earth and SSW–SW as Hard Earth.
+export const ELEMENT_STYLES = {
+  classic: { label: 'Classic', note: 'NE is Water and NW is Space (as VastuGrid)' },
+  looseEarth: { label: 'Loose Earth', note: 'NE and NW are Loose Earth; SSW and SW are Hard Earth' }
+};
+
+const LOOSE_EARTH_ZONES = new Set(['NE', 'NW']);
+
+// A zone's colour group under a style: one of the five elements, or HardEarth / LooseEarth
+export const zoneTone = (zoneId, style = 'classic') => {
+  const zone = ZONES_16_DATA.find((z) => z.id === zoneId);
+  if (!zone) return null;
+  if (style !== 'looseEarth') return zone.element;
+  if (LOOSE_EARTH_ZONES.has(zoneId)) return 'LooseEarth';
+  return zone.element === 'Earth' ? 'HardEarth' : zone.element;
+};
+
+// The element (one of five) a zone belongs to under a style
+export const zoneElement = (zoneId, style = 'classic') => {
+  const tone = zoneTone(zoneId, style);
+  return tone === 'HardEarth' || tone === 'LooseEarth' ? 'Earth' : tone;
+};
+
 // Auspicious Entrance Codes Set
 export const AUSPICIOUS_ENTRANCES = new Set(['N3', 'N4', 'E3', 'E4', 'S3', 'S4', 'W3', 'W4']);
 

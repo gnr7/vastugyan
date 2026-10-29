@@ -731,6 +731,14 @@ button:disabled { cursor: default; opacity: 0.38; }
 /* Mandala shape switch above the layer tiles */
 .switch-row.switch-row-top { margin: 0 0 12px; }
 
+/* Five elements style: a two-way choice under the layer tiles */
+.style-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 14px; margin-top: 12px; padding: 14px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--paper-2); }
+.style-row .switch-text { flex: 1 1 180px; }
+.seg-control { display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: var(--paper); border: 1px solid var(--line-strong); flex: none; }
+.seg-control button { min-height: 36px; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.seg-control button[aria-checked="true"] { background: var(--ink); color: var(--paper); }
+.layer-glyph .glyph-north { stroke: var(--kumkum); }
+
 /* Land energy dimensions line */
 .dims-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; padding: 10px 12px; border-radius: var(--r-md); background: var(--paper-2); border: 1px solid var(--line); }
 .dims-text { font-size: 13px; color: var(--ink-2); }

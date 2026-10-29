@@ -35,6 +35,7 @@ export const createInitialState = () => Object.freeze({
   rotation: 0,                // 0 - 360 degrees
   gridAlign: 'north',         // 'north': 9x9 grid turns with North · 'walls': grid stays on the plot's walls
   mandalaShape: 'plot',       // 'plot': rings follow the plot outline (as VastuGrid) · 'rect': classical rectangle
+  elementStyle: 'classic',    // 'classic': NE is Water, NW is Space (as VastuGrid) · 'looseEarth': NE and NW are Loose Earth
   landDims: null,             // { length, breadth } in feet typed by the user, or null to measure from the walls
   calibration: null,          // { realPerWorld, unit: 'ft' | 'm', realLength } once Set Scale is applied
   isCalibrating: false,
@@ -49,7 +50,8 @@ export const createInitialState = () => Object.freeze({
     gatePadas: false,
     marma: false,
     vithi: false,
-    elements: false
+    elements: false,
+    compassWheel: false
   }),
   metrics: Object.freeze({
     area: 0,
@@ -261,6 +263,13 @@ export const setMandalaShape = (shape) => (state) => {
     mandalaShape,
     metrics: recalculateMetrics(state.polygon, state.isPolygonClosed, state.rotation, state.gridAlign, mandalaShape)
   };
+};
+
+// Which school's Five Elements mapping to use; it only changes colours and shares, not geometry
+export const setElementStyle = (style) => (state) => {
+  const elementStyle = style === 'looseEarth' ? 'looseEarth' : 'classic';
+  if (elementStyle === state.elementStyle) return state;
+  return { ...state, elementStyle };
 };
 
 // Plot length and breadth typed by the user (feet) for Land Energy, or null to measure from the walls
@@ -537,6 +546,7 @@ export const restoreProject = (saved) => (state) => {
     : null;
   const layers = Object.freeze({ ...state.layers, ...(saved.layers || {}) });
   const mandalaShape = saved.mandalaShape === 'rect' ? 'rect' : 'plot';
+  const elementStyle = saved.elementStyle === 'looseEarth' ? 'looseEarth' : 'classic';
   const landDims = saved.landDims && saved.landDims.length > 0 && saved.landDims.breadth > 0 ? Object.freeze({ ...saved.landDims }) : null;
   return {
     ...state,
@@ -545,6 +555,7 @@ export const restoreProject = (saved) => (state) => {
     rotation,
     gridAlign,
     mandalaShape,
+    elementStyle,
     landDims,
     calibration,
     layers,

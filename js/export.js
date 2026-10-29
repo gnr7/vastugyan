@@ -14,6 +14,7 @@ import {
   formatLength
 } from './analysis.js';
 import { barChartToDataUrl } from './barchart.js';
+import { ELEMENT_STYLES } from './zones.js';
 
 /**
  * Hand a finished file to the person: the phone's share sheet on touch devices
@@ -70,10 +71,12 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
   }
 
   const { jsPDF } = window.jspdf;
+  // Compressed so a report is small enough to send on WhatsApp or by email
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
-    format: 'a4'
+    format: 'a4',
+    compress: true
   });
 
   const dateStr = new Date().toISOString().slice(0, 10);
@@ -89,11 +92,12 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
   const areaData = calculateAreaMetrics(state.metrics);
   const cal = state.calibration;
   const grid = state.metrics.grid9x9;
-  const tatvaData = calculatePanchTatvaSummary(state.metrics.zones16);
+  const elementStyle = state.elementStyle || 'classic';
+  const tatvaData = calculatePanchTatvaSummary(state.metrics.zones16, elementStyle);
   const gateData = calculateGateAssessment(state.metrics.entranceGates32);
   const landData = calculatePositiveLandEnergy(state.metrics, cal, state.landDims);
   const gates = state.metrics.entranceGates32 || [];
-  const barChart = calculate16BarChart(state.metrics.zones16);
+  const barChart = calculate16BarChart(state.metrics.zones16, elementStyle);
   const vithiData = calculateVithiSummary(state.metrics.vithi);
   // Page 4 (the 32 entrances) appears with page 3 whenever the plot is closed
   const totalPages = barChart.hasData ? 4 : 2;
@@ -139,7 +143,9 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
 
   // Embed High-Res Canvas Snapshot
   if (canvas) {
-    const canvasDataUrl = canvas.toDataURL('image/png', 0.95);
+    // A traced plan stays a sharp PNG; over a photographed floor plan, JPEG is far smaller
+    const planIsPhoto = !!state.image;
+    const canvasDataUrl = planIsPhoto ? canvas.toDataURL('image/jpeg', 0.9) : canvas.toDataURL('image/png');
     const planWidth = 182;
     const planHeight = 115;
     const planX = 14;
@@ -151,7 +157,7 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
     doc.setDrawColor(218, 220, 224);
     doc.rect(planX - 1, planY - 1, planWidth + 2, planHeight + 2, 'S');
 
-    doc.addImage(canvasDataUrl, 'PNG', planX, planY, planWidth, planHeight);
+    doc.addImage(canvasDataUrl, planIsPhoto ? 'JPEG' : 'PNG', planX, planY, planWidth, planHeight, undefined, 'FAST');
   }
 
   // Key Area Metrics Card (Page 1 bottom)
@@ -247,7 +253,9 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(...mediumGray);
-  doc.text('Share of the plot area falling in each element\'s directional zones:', 14, yPos);
+  const tatvaIntro = doc.splitTextToSize(`Share of the plot area falling in each element's directional zones. ${ELEMENT_STYLES[elementStyle].label} style: ${ELEMENT_STYLES[elementStyle].note}.`, 182);
+  doc.text(tatvaIntro, 14, yPos);
+  yPos += (tatvaIntro.length - 1) * 3.6;
 
   yPos += 5;
   // Table Header
@@ -279,7 +287,16 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
-    doc.text(item.zones.join(', '), 60, yPos + 6);
+    if (item.earthSplit) {
+      // Loose Earth style: show the hard and loose parts of Earth's share
+      doc.setFontSize(7);
+      doc.text(item.hasData
+        ? `SSW, SW (hard ${item.earthSplit.hard}%) · NE, NW (loose ${item.earthSplit.loose}%)`
+        : 'SSW, SW (hard) · NE, NW (loose)', 60, yPos + 6);
+      doc.setFontSize(8);
+    } else {
+      doc.text(item.zones.join(', '), 60, yPos + 6);
+    }
     doc.text(item.formattedPercentage, 120, yPos + 6);
     doc.text(item.significance, 145, yPos + 6);
 
@@ -419,7 +436,7 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
     const chartH = (chartW * 400) / 720;
     doc.setDrawColor(218, 220, 224);
     doc.rect(19.5, 25.5, chartW + 1, chartH + 1, 'S');
-    doc.addImage(barChartToDataUrl(barChart), 'PNG', 20, 26, chartW, chartH);
+    doc.addImage(barChartToDataUrl(barChart), 'PNG', 20, 26, chartW, chartH, undefined, 'FAST');
 
     // Summary card
     yPos = 26 + chartH + 8;
