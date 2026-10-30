@@ -364,7 +364,8 @@ button:disabled { cursor: default; opacity: 0.38; }
 
 /* ---------- Panel (bottom sheet) ---------- */
 .panel {
-  --sheet-full: calc(100% - var(--dock-h) - var(--safe-b) - 10px);
+  /* At its tallest the sheet still leaves part of the plan in view */
+  --sheet-full: calc((100% - var(--dock-h) - var(--safe-b)) * 0.72);
   position: absolute;
   left: 0; right: 0;
   bottom: calc(var(--dock-h) + var(--safe-b));
@@ -378,7 +379,7 @@ button:disabled { cursor: default; opacity: 0.38; }
   transition: transform 0.42s var(--spring);
   will-change: transform;
 }
-.panel[data-sheet="half"] { transform: translateY(45%); }
+.panel[data-sheet="half"] { transform: translateY(30%); }
 .panel[data-sheet="full"] { transform: translateY(0); }
 .panel[data-sheet="hidden"] { transform: translateY(100%); }
 .panel.is-dragging { transition: none; }
@@ -398,9 +399,10 @@ button:disabled { cursor: default; opacity: 0.38; }
 .summary-chip.is-mid { background: var(--brass-wash); border-color: transparent; color: var(--brass); }
 .summary-chip.is-bad { background: var(--kumkum-wash); border-color: transparent; color: var(--kumkum); }
 
+/* Phones and portrait tablets use the dock to switch sections; the side panel uses these tabs */
 .panel-tabs {
   flex: none;
-  display: flex; gap: 6px;
+  display: none; gap: 6px;
   padding: 2px 14px 10px;
   overflow-x: auto;
   scrollbar-width: none;
@@ -441,31 +443,31 @@ button:disabled { cursor: default; opacity: 0.38; }
 .scale-status.is-set { color: var(--tulsi); font-weight: 600; }
 
 /* Layers */
-.layer-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.layer-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
 .layer-tile { position: relative; display: block; cursor: pointer; }
 .layer-tile input { position: absolute; opacity: 0; pointer-events: none; }
 .layer-body {
-  display: grid; grid-template-columns: 32px 1fr; grid-template-rows: auto auto; column-gap: 10px;
-  align-items: center;
-  min-height: 64px;
-  padding: 10px 12px;
-  border-radius: var(--r-lg);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  min-height: 46px;
+  padding: 6px 10px 6px 12px;
+  border-radius: var(--r-md);
   border: 1px solid var(--line);
   background: var(--paper-2);
   transition: background 0.18s var(--ease), border-color 0.18s var(--ease), transform 0.12s var(--ease);
 }
 .layer-tile:active .layer-body { transform: scale(0.98); }
-.layer-glyph { grid-row: span 2; width: 30px; height: 30px; fill: none; stroke: var(--muted); stroke-width: 1.4; stroke-linejoin: round; }
-.layer-glyph .glyph-fill { fill: var(--muted); stroke: none; }
-.layer-name { font-size: 14px; font-weight: 600; color: var(--ink); line-height: 1.2; }
-.layer-sub { font-size: 12px; color: var(--muted); line-height: 1.2; }
+.layer-name { font-size: 13.5px; font-weight: 600; color: var(--ink); line-height: 1.2; }
+.layer-switch { position: relative; flex: none; width: 30px; height: 18px; border-radius: 999px; background: var(--line-strong); transition: background 0.18s var(--ease); }
+.layer-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--paper); transition: transform 0.2s var(--spring); }
 .layer-tile input:checked + .layer-body { background: var(--saffron-wash); border-color: var(--saffron); }
-.layer-tile input:checked + .layer-body .layer-glyph { stroke: var(--saffron-deep); }
-.layer-tile input:checked + .layer-body .glyph-fill { fill: var(--kumkum); }
+.layer-tile input:checked + .layer-body .layer-switch { background: var(--saffron); }
+.layer-tile input:checked + .layer-body .layer-switch::after { transform: translateX(12px); }
 .layer-tile input:focus-visible + .layer-body { outline: 2px solid var(--saffron); outline-offset: 2px; }
+.layer-tile-action { width: 100%; text-align: left; }
+.layer-tile-action .icon { width: 18px; height: 18px; color: var(--muted); }
 
 /* Switch row (alignment) */
-.switch-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 18px; padding: 14px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--paper-2); cursor: pointer; }
+.switch-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 12px; padding: 14px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--paper-2); cursor: pointer; }
 .switch-text { display: grid; gap: 2px; }
 .switch-label { font-size: 14px; font-weight: 600; }
 .switch-sub { font-size: 12.5px; color: var(--muted); }
@@ -639,16 +641,18 @@ button:disabled { cursor: default; opacity: 0.38; }
   .brand-name { font-size: 18px; }
   .brand-mark { width: 28px; height: 28px; }
   .topbar-actions .icon-btn { width: 40px; height: 40px; }
-  /* All five panel tabs stay in view, so Plan is never hidden off the edge */
-  .panel-tabs { gap: 2px; padding-left: 8px; padding-right: 8px; }
-  .panel-tabs button { flex: 1 0 auto; padding: 0 9px; font-size: 12.5px; }
+  /* Seven dock buttons share the width */
+  .dock { padding-left: calc(2px + var(--safe-l)); padding-right: calc(2px + var(--safe-r)); }
+  .dock-btn { font-size: 10.5px; letter-spacing: 0; }
+  .dock-btn .icon { width: 20px; height: 20px; }
 }
 
 /* The start screen owns the stage until it's dismissed */
 .stage:has(.onboard[style*="flex"]) :is(.compass, .zoom) { opacity: 0; pointer-events: none; }
 
 /* ---------- Large screens: side panel, floating dock ---------- */
-@media (min-width: 1024px), (min-width: 900px) and (orientation: landscape), (min-width: 640px) and (orientation: landscape) and (max-height: 540px) {
+@media (min-width: 1024px), (min-width: 640px) and (orientation: landscape) {
+  :root { --panel-w: clamp(280px, 38vw, 384px); }
   .workspace { display: grid; grid-template-columns: minmax(0, 1fr) var(--panel-w); grid-template-rows: minmax(0, 1fr); }
   .stage { position: relative; inset: auto; grid-column: 1; min-height: 0; }
 
@@ -666,8 +670,11 @@ button:disabled { cursor: default; opacity: 0.38; }
   }
   .panel-handle { cursor: default; padding: 16px 20px 12px; border-bottom: 1px solid var(--line); }
   .grip { display: none; }
-  .panel-tabs { padding: 12px 16px; }
-  .panel-body { padding: 4px 20px 32px; }
+  .panel-tabs { display: flex; padding: 12px 16px; }
+  .panel-body { padding: 12px 20px 32px; }
+
+  /* The panel's tabs switch sections here, so the floating dock only holds the tools */
+  .dock-btn[data-open-panel], .dock-sep { display: none; }
 
   .dock {
     left: calc((100% - var(--panel-w)) / 2);
@@ -693,6 +700,12 @@ button:disabled { cursor: default; opacity: 0.38; }
   .bar-chart-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
+/* Narrow side panels: all five tabs stay in view, so Plan is never hidden off the edge */
+@media (min-width: 640px) and (max-width: 1023px) and (orientation: landscape) {
+  .panel-tabs { gap: 2px; padding: 8px; }
+  .panel-tabs button { flex: 1 0 auto; padding: 0 8px; font-size: 12px; }
+}
+
 /* Phones held sideways: the side panel keeps the full height for the plan, so it slims down */
 @media (min-width: 640px) and (orientation: landscape) and (max-height: 540px) {
   :root { --panel-w: clamp(280px, 40vw, 340px); }
@@ -704,11 +717,11 @@ button:disabled { cursor: default; opacity: 0.38; }
   .panel-handle { padding: 10px 16px 8px; }
   .panel-tabs { gap: 2px; padding: 8px; }
   .panel-tabs button { flex: 1 0 auto; min-height: 34px; padding: 0 8px; font-size: 12px; }
-  .panel-body { padding: 4px 16px 24px; }
+  .panel-body { padding: 10px 16px 24px; }
 }
 
 @media (min-width: 600px) and (max-width: 1023px) and (orientation: portrait) {
-  .layer-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .layer-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .metrics-grid, .gate-assessment-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .panel-body, .panel-handle, .panel-tabs { padding-left: max(24px, calc((100% - 720px) / 2)); padding-right: max(24px, calc((100% - 720px) / 2)); }
   .modal-dialog { max-width: 640px; border-radius: var(--r-xl) var(--r-xl) 0 0; }
@@ -727,22 +740,21 @@ button:disabled { cursor: default; opacity: 0.38; }
 }
 [hidden] { display: none !important; }
 
-/* Mandala shape switch above the layer tiles */
-.switch-row.switch-row-top { margin: 0 0 12px; }
-
-/* One-tap views at the top of Layers */
-.view-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.view-chips button { min-height: 38px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--paper); font-size: 13.5px; font-weight: 600; color: var(--ink-2); }
+/* One-tap views at the top of Layers: a single row, so the switches stay near the plan */
+.view-chips { display: flex; gap: 4px; margin: 8px 0 10px; overflow-x: auto; scrollbar-width: none; }
+.view-chips::-webkit-scrollbar { display: none; }
+.view-chips button { flex: none; min-height: 38px; padding: 0 9px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--paper); font-size: 13px; font-weight: 600; color: var(--ink-2); }
 .view-chips button[aria-checked="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
-.view-note { margin: 8px 0 18px; font-size: 12.5px; color: var(--muted); }
 
 /* Five elements style: a two-way choice under the layer tiles */
 .style-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 14px; margin-top: 12px; padding: 14px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--paper-2); }
 .style-row .switch-text { flex: 1 1 180px; }
-.seg-control { display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: var(--paper); border: 1px solid var(--line-strong); flex: none; }
+.seg-control { display: inline-flex; max-width: 100%; padding: 3px; gap: 2px; border-radius: 999px; background: var(--paper); border: 1px solid var(--line-strong); flex: none; }
 .seg-control button { min-height: 36px; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--muted); }
 .seg-control button[aria-checked="true"] { background: var(--ink); color: var(--paper); }
-.layer-glyph .glyph-north { stroke: var(--kumkum); }
+/* Five sizes share the row's width, so they fit the narrowest side panel */
+#chakraSizeRow .seg-control { flex: 1 1 100%; }
+#chakraSizeRow .seg-control button { flex: 1 1 0; min-width: 0; padding: 0 4px; }
 
 /* Land energy dimensions line */
 .dims-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; padding: 10px 12px; border-radius: var(--r-md); background: var(--paper-2); border: 1px solid var(--line); }

@@ -1676,6 +1676,13 @@ export class CanvasController {
     return { ...next, scale, x, y };
   }
 
+  // The visible area changed: keep the whole plan in view, unless the person has zoomed or panned
+  refitIfFitted() {
+    const now = this.store.getState().viewport;
+    const last = this.fittedViewport;
+    if (last && now.scale === last.scale && now.x === last.x && now.y === last.y) this.fitToView();
+  }
+
   fitToView() {
     const viewport = this.fitViewport(this.store.getState());
     this.fittedViewport = viewport;

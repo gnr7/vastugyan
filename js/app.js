@@ -57,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const dockTop = document.getElementById('dock').getBoundingClientRect().top;
     return Math.max(0, stage.bottom - Math.min(panelTop, dockTop));
   };
+  ui.onSheetSettled = () => canvasController.refitIfFitted();
   let lastState = store.getState();
   // The start screen shows until the person picks a plan, a blank canvas, or starts drawing
   let workspaceStarted = false;
@@ -365,6 +366,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (barChartBackdrop) barChartBackdrop.style.display = 'none';
   };
 
+  const btnLayerBarChart = document.getElementById('btnLayerBarChart');
+  if (btnLayerBarChart) btnLayerBarChart.addEventListener('click', () => btnOpenBarChart?.click());
   if (btnOpenBarChart) {
     btnOpenBarChart.addEventListener('click', () => {
       barChartBackdrop.style.display = 'flex';
@@ -771,6 +774,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasZoneAreas = calculate16BarChart(state.metrics.zones16, state.elementStyle).hasData;
     if (btnOpenBarChart) {
       btnOpenBarChart.disabled = !hasZoneAreas;
+      if (btnLayerBarChart) btnLayerBarChart.disabled = !hasZoneAreas;
       btnOpenBarChart.title = hasZoneAreas ? 'Area share of each of the 16 directions' : 'Close the plot boundary first';
     }
     if (isBarChartOpen()) renderBarChart(state);

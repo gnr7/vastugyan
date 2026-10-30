@@ -44,6 +44,7 @@
       <symbol id="i-share" viewBox="0 0 24 24"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/></symbol>
       <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
       <symbol id="i-redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></symbol>
+      <symbol id="i-north" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 8-2.5 5.5L8 16l2.5-5.500z"/></symbol>
       <symbol id="i-plan" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h7v9M14 3v6h7"/></symbol>
       <symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3"/></symbol>
       <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></symbol>
@@ -85,9 +86,6 @@
         </button>
         <button id="btnTheme" class="icon-btn" title="Dark mode" aria-label="Switch to dark mode">
           <svg class="icon"><use href="#i-moon"/></svg>
-        </button>
-        <button class="icon-btn" data-open-panel="plan" title="Floor plan and project" aria-label="Floor plan and project">
-          <svg class="icon"><use href="#i-plan"/></svg>
         </button>
       </div>
     </header>
@@ -191,115 +189,61 @@
         <div class="panel-body" id="panelBody">
           <!-- LAYERS -->
           <section class="panel-section" data-panel="layers">
-            <h2 class="section-heading">View</h2>
-            <div class="view-chips" role="radiogroup" aria-label="View">
+            <div class="view-chips" role="radiogroup" aria-label="One-tap views">
               <button type="button" role="radio" data-view="plan" aria-checked="false">Plan</button>
               <button type="button" role="radio" data-view="mandala" aria-checked="false">Mandala</button>
-              <button type="button" role="radio" data-view="zones" aria-checked="false">Zones</button>
-              <button type="button" role="radio" data-view="entrances" aria-checked="false">Entrances</button>
+              <button type="button" role="radio" data-view="zones" aria-checked="false">Directions</button>
+              <button type="button" role="radio" data-view="entrances" aria-checked="false">Gates</button>
               <button type="button" role="radio" data-view="marma" aria-checked="false">Marma</button>
             </div>
-            <p class="view-note" id="viewNote">Each view shows only the layers that belong together. Mix your own below.</p>
-            <h2 class="section-heading">Overlays</h2>
-            <label class="switch-row switch-row-top">
-              <span class="switch-text">
-                <span class="switch-label">Mandala follows the plot outline</span>
-                <span class="switch-sub">On: rings are copies of your plot, Brahmasthan is exactly 1/9 of it. Off: classical rectangle around the plot.</span>
-              </span>
-              <span class="switch">
-                <input type="checkbox" id="toggleMandalaPlot" checked>
-                <span class="switch-track"></span>
-              </span>
-            </label>
             <div class="layer-grid">
               <label class="layer-tile">
-                <input type="checkbox" id="toggleGrid9x9" checked>
-                <span class="layer-body">
-                  <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>
-                  <span class="layer-name">9×9 grid</span>
-                  <span class="layer-sub">81 padas</span>
-                </span>
-              </label>
-              <label class="layer-tile">
-                <input type="checkbox" id="toggleBrahmasthan" checked>
-                <span class="layer-body">
-                  <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18"/><rect x="9" y="9" width="6" height="6" class="glyph-fill"/></svg>
-                  <span class="layer-name">Brahmasthan</span>
-                  <span class="layer-sub">Central 9 padas</span>
-                </span>
-              </label>
-              <label class="layer-tile">
-                <input type="checkbox" id="toggleDevtas45">
-                <span class="layer-body">
-                  <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18"/><rect x="7" y="7" width="10" height="10"/><path d="M3 7h4M3 11h4M3 15h4M17 7h4M17 11h4M17 15h4"/></svg>
-                  <span class="layer-name">45 Devtas</span>
-                  <span class="layer-sub">32 outer · 13 inner</span>
-                </span>
-              </label>
-              <label class="layer-tile">
-                <input type="checkbox" id="toggleDevtaNames">
-                <span class="layer-body">
-                  <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19 9 5l5 14M6 14h6"/><path d="M15 19v-6a3 3 0 0 1 6 0v6M15 16h6"/></svg>
-                  <span class="layer-name">Devta names</span>
-                  <span class="layer-sub">Labels and numbers</span>
-                </span>
-              </label>
-              <label class="layer-tile">
                 <input type="checkbox" id="toggleZones16">
-                <span class="layer-body">
-                  <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/></svg>
-                  <span class="layer-name">16 zones</span>
-                  <span class="layer-sub">22.5° each</span>
-                </span>
+                <span class="layer-body"><span class="layer-name">16 Directions</span><span class="layer-switch" aria-hidden="true"></span></span>
               </label>
               <label class="layer-tile">
                 <input type="checkbox" id="toggleGates32">
-                <span class="layer-body">
-                  <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14"/><path d="M9 2v3M12 2v3M15 2v3M9 19v3M12 19v3M15 19v3M2 9h3M2 12h3M2 15h3M19 9h3M19 12h3M19 15h3"/></svg>
-                  <span class="layer-name">32 entrances</span>
-                  <span class="layer-sub">N1–N8 … W1–W8</span>
-                </span>
+                <span class="layer-body"><span class="layer-name">32 Gates</span><span class="layer-switch" aria-hidden="true"></span></span>
               </label>
               <label class="layer-tile">
                 <input type="checkbox" id="toggleGatePadas">
-                <span class="layer-body">
-                  <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18"/><rect x="7" y="7" width="10" height="10"/><path d="M3 9l4 2M3 15l4-2M21 9l-4 2M21 15l-4-2M9 3l2 4M15 3l-2 4M9 21l2-4M15 21l-2-4"/></svg>
-                  <span class="layer-name">32 gates 81 pad</span>
-                  <span class="layer-sub">Outer padas, coded</span>
-                </span>
-              </label>
-              <label class="layer-tile">
-                <input type="checkbox" id="toggleMarma">
-                <span class="layer-body">
-                  <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18"/><path d="m3 3 18 18M21 3 3 21"/><circle cx="12" cy="12" r="1.6" class="glyph-fill"/></svg>
-                  <span class="layer-name">Marma sthan</span>
-                  <span class="layer-sub">Sensitive lines</span>
-                </span>
-              </label>
-              <label class="layer-tile">
-                <input type="checkbox" id="toggleVithi">
-                <span class="layer-body">
-                  <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19"/><rect x="6" y="6" width="12" height="12"/><rect x="9.5" y="9.5" width="5" height="5" class="glyph-fill"/></svg>
-                  <span class="layer-name">Vithi mandal</span>
-                  <span class="layer-sub">4 sacred rings</span>
-                </span>
-              </label>
-              <label class="layer-tile">
-                <input type="checkbox" id="toggleElements">
-                <span class="layer-body">
-                  <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="2.2"/><circle cx="19" cy="10" r="2.2"/><circle cx="16.5" cy="18.5" r="2.2"/><circle cx="7.5" cy="18.5" r="2.2"/><circle cx="5" cy="10" r="2.2"/></svg>
-                  <span class="layer-name">Panch tatva</span>
-                  <span class="layer-sub">Element colours</span>
-                </span>
+                <span class="layer-body"><span class="layer-name">32 Gates 81 Pad</span><span class="layer-switch" aria-hidden="true"></span></span>
               </label>
               <label class="layer-tile">
                 <input type="checkbox" id="toggleShaktiChakra">
-                <span class="layer-body">
-                  <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/><path d="M12 8.5v7" class="glyph-north"/></svg>
-                  <span class="layer-name">Shakti Chakra</span>
-                  <span class="layer-sub">Degrees, gates, zones</span>
-                </span>
+                <span class="layer-body"><span class="layer-name">Shakti Chakra</span><span class="layer-switch" aria-hidden="true"></span></span>
               </label>
+              <label class="layer-tile">
+                <input type="checkbox" id="toggleDevtas45">
+                <span class="layer-body"><span class="layer-name">45 Devtas</span><span class="layer-switch" aria-hidden="true"></span></span>
+              </label>
+              <label class="layer-tile">
+                <input type="checkbox" id="toggleDevtaNames">
+                <span class="layer-body"><span class="layer-name">45 Devta Names</span><span class="layer-switch" aria-hidden="true"></span></span>
+              </label>
+              <label class="layer-tile">
+                <input type="checkbox" id="toggleMarma">
+                <span class="layer-body"><span class="layer-name">Marma Sthan</span><span class="layer-switch" aria-hidden="true"></span></span>
+              </label>
+              <label class="layer-tile">
+                <input type="checkbox" id="toggleVithi">
+                <span class="layer-body"><span class="layer-name">Vithi Mandal</span><span class="layer-switch" aria-hidden="true"></span></span>
+              </label>
+              <label class="layer-tile">
+                <input type="checkbox" id="toggleElements">
+                <span class="layer-body"><span class="layer-name">Five Elements</span><span class="layer-switch" aria-hidden="true"></span></span>
+              </label>
+              <label class="layer-tile">
+                <input type="checkbox" id="toggleGrid9x9" checked>
+                <span class="layer-body"><span class="layer-name">9×9 Grid</span><span class="layer-switch" aria-hidden="true"></span></span>
+              </label>
+              <label class="layer-tile">
+                <input type="checkbox" id="toggleBrahmasthan" checked>
+                <span class="layer-body"><span class="layer-name">Brahmasthan</span><span class="layer-switch" aria-hidden="true"></span></span>
+              </label>
+              <button type="button" class="layer-tile layer-tile-action" id="btnLayerBarChart" disabled>
+                <span class="layer-body"><span class="layer-name">16 Bar Chart</span><svg class="icon" aria-hidden="true"><use href="#i-bars"/></svg></span>
+              </button>
             </div>
             <div class="style-row" id="chakraSizeRow" style="display: none">
               <span class="switch-text">
@@ -314,6 +258,16 @@
                 <button type="button" role="radio" data-chakra-size="1.5" aria-checked="false">150%</button>
               </div>
             </div>
+            <label class="switch-row">
+              <span class="switch-text">
+                <span class="switch-label">Mandala follows the plot outline</span>
+                <span class="switch-sub">Off: classical rectangle around the plot</span>
+              </span>
+              <span class="switch">
+                <input type="checkbox" id="toggleMandalaPlot" checked>
+                <span class="switch-track"></span>
+              </span>
+            </label>
             <div class="style-row">
               <span class="switch-text">
                 <span class="switch-label">Five elements style</span>
@@ -562,8 +516,14 @@
         <button class="dock-btn" data-open-panel="analysis">
           <svg class="icon"><use href="#i-analysis"/></svg><span class="dock-label">Analysis</span>
         </button>
+        <button class="dock-btn" data-open-panel="north">
+          <svg class="icon"><use href="#i-north"/></svg><span class="dock-label">North</span>
+        </button>
         <button class="dock-btn" data-open-panel="export">
           <svg class="icon"><use href="#i-share"/></svg><span class="dock-label">Export</span>
+        </button>
+        <button class="dock-btn" data-open-panel="plan">
+          <svg class="icon"><use href="#i-plan"/></svg><span class="dock-label">Plan</span>
         </button>
       </nav>
     </main>

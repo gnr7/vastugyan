@@ -5,7 +5,7 @@
 
 import { setRotation, commitRotationHistory } from './state.js';
 
-const WIDE_QUERY = '(min-width: 1024px), (min-width: 900px) and (orientation: landscape), (min-width: 640px) and (orientation: landscape) and (max-height: 540px)';
+const WIDE_QUERY = '(min-width: 1024px), (min-width: 640px) and (orientation: landscape)';
 const SHEET_STATES = ['peek', 'half', 'full'];
 const DOCK_PANELS = new Set(['layers', 'analysis', 'export']);
 
@@ -29,7 +29,7 @@ export const initUI = (store) => {
   const toastStack = document.getElementById('toastStack');
   const wideMedia = window.matchMedia(WIDE_QUERY);
 
-  let currentPanel = 'analysis';
+  let currentPanel = 'layers';
   let sheetBeforeTool = null; // sheet state to restore after drawing / Set Scale
 
   const isWide = () => wideMedia.matches;
@@ -77,7 +77,7 @@ export const initUI = (store) => {
     const h = panel.offsetHeight;
     const peek = parseFloat(getComputedStyle(panel).getPropertyValue('--peek-h')) || 68;
     if (state === 'full') return 0;
-    if (state === 'half') return h * 0.45;
+    if (state === 'half') return h * 0.3;
     return h - peek;
   };
 
@@ -141,6 +141,11 @@ export const initUI = (store) => {
   };
   handle.addEventListener('pointerup', endDrag);
   handle.addEventListener('pointercancel', endDrag);
+
+  // Once the sheet settles the visible part of the plan has changed size, so the app can refit it
+  panel.addEventListener('transitionend', (e) => {
+    if (e.target === panel && e.propertyName === 'transform') api.onSheetSettled?.();
+  });
 
   wideMedia.addEventListener('change', () => setSheet(isWide() ? 'peek' : panel.dataset.sheet));
 
@@ -273,5 +278,6 @@ export const initUI = (store) => {
   measurePeek();
 
   setPanel(currentPanel);
-  return { openPanel, setPanel, setSheet, showToast, sync, isWide };
+  const api = { openPanel, setPanel, setSheet, showToast, sync, isWide, onSheetSettled: null };
+  return api;
 };
