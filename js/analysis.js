@@ -252,19 +252,22 @@ export const calculateGateAssessment = (entranceGates32) => {
 };
 
 /**
- * Remainder energy pattern table: (Length + Breadth) ÷ 8 → remainder.
- * Results follow the VastuGrid-style reading (remainder 4 = best); the classical Ayadi
- * Yoni names are intentionally not used because that method computes and reads differently.
+ * Remainder energy pattern table: (Length + Breadth) ÷ 8 → remainder, as VastuGrid reads it:
+ * even remainders are positive, odd ones are not, and an exact division counts as remainder 8.
+ * The classical Ayadi Yoni names are intentionally not used because that method computes and
+ * reads differently.
  */
+const POSITIVE_PATTERN = { isPositive: true, quality: 'Best', description: 'Positive Energy: dhan, sukh, santan, progress' };
+const NEGATIVE_PATTERN = { isPositive: false, quality: 'Avoid', description: 'Negative Energy' };
 export const ENERGY_PATTERNS_DICT = {
-  0: { isPositive: false, quality: 'Caution', description: 'Mixed/Weak Energy (delays, unpredictability; remedial measures advised)' },
-  1: { isPositive: true, quality: 'Auspicious', description: 'Positive Energy (success, sustained growth, fame & leadership)' },
-  2: { isPositive: false, quality: 'Inauspicious', description: 'Negative Tendency (anxiety, conflicts, higher restlessness)' },
-  3: { isPositive: true, quality: 'Auspicious', description: 'Positive Energy (power, dynamic courage, victory & authority)' },
-  4: { isPositive: true, quality: 'Best', description: 'Positive Energy: dhan, sukh, santan, progress' },
-  5: { isPositive: true, quality: 'Auspicious', description: 'Positive Energy (steady prosperity, financial stability & harmony)' },
-  6: { isPositive: false, quality: 'Inauspicious', description: 'Negative Tendency (instability, frequent hurdles & fluctuating gains)' },
-  7: { isPositive: true, quality: 'Best', description: 'Positive Energy: abundant wealth, royal status & spiritual wisdom' }
+  1: NEGATIVE_PATTERN,
+  2: POSITIVE_PATTERN,
+  3: NEGATIVE_PATTERN,
+  4: POSITIVE_PATTERN,
+  5: NEGATIVE_PATTERN,
+  6: POSITIVE_PATTERN,
+  7: NEGATIVE_PATTERN,
+  8: POSITIVE_PATTERN
 };
 
 /**
@@ -342,14 +345,14 @@ export const calculatePositiveLandEnergy = (metrics, calibration = null, landDim
 
   // 4. Energy Pattern (Remainder method): (Length + Breadth) ÷ 8 → remainder
   const sumDimensions = Math.round(length + breadth);
-  const remainder = sumDimensions % 8;
+  const remainder = sumDimensions % 8 || 8;
   // Borderline when a small tracing difference (under 0.3 ft) would round L + B the other way
   const exactSum = length + breadth;
   const toBoundary = Math.abs(exactSum - (Math.floor(exactSum) + 0.5));
   const borderline = toBoundary < 0.3;
   const otherSum = exactSum >= Math.floor(exactSum) + 0.5 ? sumDimensions - 1 : sumDimensions + 1;
-  const alternateRemainder = borderline ? ((otherSum % 8) + 8) % 8 : null;
-  const remainderInfo = ENERGY_PATTERNS_DICT[remainder] || ENERGY_PATTERNS_DICT[0];
+  const alternateRemainder = borderline ? ((otherSum % 8) + 8) % 8 || 8 : null;
+  const remainderInfo = ENERGY_PATTERNS_DICT[remainder];
 
   // 5. Length Proportion (Ratio): Length / Breadth
   const ratio = Math.round((length / breadth) * 100) / 100;

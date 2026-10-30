@@ -163,7 +163,7 @@ test('north mode keeps the old behaviour: grid turns with North and grows on a t
 test('walls mode picks the wall direction nearest North and follows rotation changes', () => {
   let s = setGridAlign('walls')(setPolygonPoints(tilted, true)(createInitialState()));
   assert.ok(near(s.metrics.gridAngle, 20, 1e-6));
-  s = setRotation(80)(s);
+  s = setRotation(280)(s); // North 80° clockwise of the top
   assert.ok(near(s.metrics.gridAngle, 110, 1e-6));
   assert.ok(near(s.metrics.zones16.angleDeg, 80));
 });

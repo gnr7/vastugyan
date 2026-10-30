@@ -465,16 +465,16 @@
                   <circle cx="50" cy="50" r="3.2" class="dial-hub"/>
                 </svg>
               </button>
-              <p class="north-hint">Turn the dial until N points to true North on your plan</p>
+              <p class="north-hint">Turn the dial until N points to true North on your plan. The number is the compass bearing the top of your plan faces.</p>
             </div>
-            <input type="range" id="rotationSlider" min="0" max="360" value="0" step="0.5" class="range" aria-label="North rotation in degrees">
+            <input type="range" id="rotationSlider" min="0" max="360" value="0" step="0.5" class="range" aria-label="Compass bearing the top of the plan faces, in degrees">
             <div class="north-row">
-              <button class="icon-btn icon-btn-boxed" id="btnRotateMinus" aria-label="Turn 1° anticlockwise"><svg class="icon"><use href="#i-minus"/></svg></button>
+              <button class="icon-btn icon-btn-boxed" id="btnRotateMinus" aria-label="Lower the bearing by 1°"><svg class="icon"><use href="#i-minus"/></svg></button>
               <label class="deg-input">
-                <input type="number" id="rotationNumber" min="0" max="360" value="0" step="0.5" inputmode="decimal" aria-label="North in degrees">
+                <input type="number" id="rotationNumber" min="0" max="360" value="0" step="0.5" inputmode="decimal" aria-label="Bearing of the top of the plan, in degrees">
                 <span>°</span>
               </label>
-              <button class="icon-btn icon-btn-boxed" id="btnRotatePlus" aria-label="Turn 1° clockwise"><svg class="icon"><use href="#i-plus"/></svg></button>
+              <button class="icon-btn icon-btn-boxed" id="btnRotatePlus" aria-label="Raise the bearing by 1°"><svg class="icon"><use href="#i-plus"/></svg></button>
               <button id="btnResetRotation" class="chip-btn">Reset</button>
             </div>
             <label class="switch-row">

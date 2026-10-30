@@ -195,7 +195,8 @@ export const initUI = (store) => {
       turn.moved = true;
       dial.classList.add('is-turning');
       const delta = bearingOf(turn.cx, turn.cy, e.clientX, e.clientY) - turn.startBearing;
-      const deg = Math.round((turn.startRotation + delta) * 2) / 2;
+      // The needle follows the finger; the number is the bearing, so it runs the other way
+      const deg = Math.round((turn.startRotation - delta) * 2) / 2;
       store.setState(setRotation(deg));
       const zone = Math.floor(store.getState().rotation / 22.5);
       if (zone !== turn.lastZone) {
@@ -216,8 +217,8 @@ export const initUI = (store) => {
     dial.addEventListener('pointercancel', finish);
     dial.addEventListener('keydown', (e) => {
       const step = e.shiftKey ? 10 : 1;
-      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') store.setState(setRotation(store.getState().rotation + step));
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') store.setState(setRotation(store.getState().rotation - step));
+      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') store.setState(setRotation(store.getState().rotation - step));
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') store.setState(setRotation(store.getState().rotation + step));
     });
   };
   bindDial(document.getElementById('compassButton'), { tapOpensNorth: true });
@@ -247,7 +248,7 @@ export const initUI = (store) => {
   // ---------- Per-state sync (called from the app's store subscription) ----------
   const sync = (state) => {
     rotors.forEach((rotor) => {
-      rotor.style.transform = `rotate(${state.rotation}deg)`;
+      rotor.style.transform = `rotate(${-state.rotation}deg)`;
     });
 
     // While tracing or setting scale on a phone, get the sheet out of the way

@@ -545,19 +545,22 @@ export const getDevtaByPadaCoords = (col, row) => {
 };
 
 // Compute the world-space bounding polygon and centroid for each of the 45 Devtas
-// Compass slice of an outer Devta's entrance code (N1 starts at 315°, 11.25° each, clockwise)
-const OUTER_START = { N: 315, E: 45, S: 135, W: 225 };
+// Compass slice of an outer Devta (11.25° each, clockwise). They are centred on the compass points,
+// so Soma (N5) sits on North, Surya (E5) on East, Yama (S5) on South, Varuna (W5) on West and Shikhi
+// (E1) on North-East. The 32 Gates start half a slice later, at 315°; see calculate32EntranceGates.
+const OUTER_CENTRE = { N: 315, E: 45, S: 135, W: 225 };
+export const outerCentreOfCode = (code) => (OUTER_CENTRE[code[0]] + (Number(code.slice(1)) - 1) * 11.25) % 360;
 const sliceOfCode = (code) => {
-  const from = OUTER_START[code[0]] + (Number(code.slice(1)) - 1) * 11.25;
-  return [from % 360, (from + 11.25) % 360];
+  const centre = outerCentreOfCode(code);
+  return [(centre - 5.625 + 360) % 360, (centre + 5.625) % 360];
 };
 
 /**
  * Spatial field of each of the 45 Devtas on the mandala grid.
  * In the plot-following mandala the inner Devtas follow the mapped grid and each outer Devta is its
- * entrance's 11.25° compass slice of the outer ring, as in VastuGrid's reports.
+ * 11.25° compass slice of the outer ring, centred on its compass point, as VastuGrid draws them.
  * @param {Object} grid9x9 - Grid from buildMandalaGrid (or generate9x9VastuGrid)
- * @param {number} northDeg - North rotation, for the outer slices
+ * @param {number} northDeg - Where North sits on screen, for the outer slices
  */
 export const computeDevtaSpatialFields = (grid9x9, northDeg = 0) => {
   if (!grid9x9 || !grid9x9.padas || grid9x9.padas.length < 81) return [];

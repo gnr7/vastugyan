@@ -14,7 +14,8 @@ import { calculatePositiveLandEnergy, calculate16BarChart, calculateAreaMetrics 
 const P = (arr) => arr.map(([x, y]) => ({ x, y }));
 const PLAN2 = P([[78,57],[721,57],[721,542],[478,542],[478,416],[78,416]]);
 const PLAN1 = P([[456,136],[1417,136],[1417,734],[1144,734],[1144,562],[692,562],[692,800],[772,800],[772,1031],[9,1031],[9,622],[180,622],[180,590],[346,590],[377,590],[377,420],[408,420],[408,211],[456,211]]);
-// VastuGrid sample report plan (970×1210 px page image), North measured at 49.4° from its gate rays
+// VastuGrid sample report plan (970×1210 px page image), North measured 49.4° clockwise of the top
+// from its gate rays, so the top of the plan faces 360 - 49.4 = 310.6°
 const VG = P([[213,55],[665,20],[672,92],[800,93],[800,765],[657,765],[657,1075],[218,1075],[215,697],[84,684],[88,130],[210,128]]);
 const U = P([[0,0],[100,0],[100,300],[300,300],[300,0],[400,0],[400,400],[0,400]]);
 
@@ -26,7 +27,7 @@ const test = (name, fn) => { fn(); passed++; console.log(`  ✔ ${name}`); };
 
 console.log('Matches VastuGrid\'s sample report');
 test('centroid, largest direction and spread match the report (SE 9.8%, ±2.0%)', () => {
-  const m = recalculateMetrics(VG, true, 49.4);
+  const m = recalculateMetrics(VG, true, 360 - 49.4);
   const c = calculate16BarChart(m.zones16);
   assert.ok(near(m.centroid.x, 450, 3) && near(m.centroid.y, 518, 3), 'centroid');
   assert.equal(c.max.id, 'SE');
@@ -43,14 +44,14 @@ test('Brahmasthan is the plot at 1/3 scale about the centroid: exactly 1/9 of it
     assert.ok(near(bc.x, m.centroid.x, 2) && near(bc.y, m.centroid.y, 2), 'centred on the centroid');
   }
 });
-test('each outer Devta is its entrance slice (Shikhi = E1, Diti = N8 …)', () => {
-  const m = recalculateMetrics(VG, true, 49.4);
+test('each outer Devta is centred half a slice before its gate (Shikhi = E1 on North-East …)', () => {
+  const m = recalculateMetrics(VG, true, 360 - 49.4);
   const gates = Object.fromEntries(m.entranceGates32.map((g) => [g.code, g]));
   m.devtaFields.filter((d) => d.entranceCode).forEach((d) => {
     const b = ((Math.atan2(d.center.x - m.centroid.x, -(d.center.y - m.centroid.y)) * 180 / Math.PI - 49.4) % 360 + 360) % 360;
     const g = gates[d.entranceCode];
-    const rel = ((b - g.fromDeg) % 360 + 360) % 360;
-    assert.ok(rel <= 11.25 + 1e-6, `${d.name} (${d.entranceCode}) at ${b.toFixed(1)}°`);
+    const off = Math.abs(((b - g.fromDeg + 540) % 360) - 180);
+    assert.ok(off <= 5.625 + 1e-6, `${d.name} (${d.entranceCode}) at ${b.toFixed(1)}°`);
   });
 });
 test('inner corner Devtas run clockwise like VastuGrid (6→7, 8→9, 10→11, 12→13)', () => {
@@ -61,7 +62,7 @@ test('inner corner Devtas run clockwise like VastuGrid (6→7, 8→9, 10→11, 1
 
 console.log('Plot-following mandala on the demo plans');
 test('no Devta sits outside the house (was 10 of 45 on plan 2 and 20 of 45 on plan 1)', () => {
-  for (const [poly, rot] of [[PLAN2, 0], [PLAN1, 0], [PLAN1, 45], [VG, 49.4]]) {
+  for (const [poly, rot] of [[PLAN2, 0], [PLAN1, 0], [PLAN1, 45], [VG, 360 - 49.4]]) {
     const m = recalculateMetrics(poly, true, rot);
     const out = m.devtaFields.filter((d) => !inside(poly, d.center)).map((d) => d.name);
     assert.deepEqual(out, [], `outside: ${out.join(', ')}`);
@@ -84,14 +85,14 @@ test('Land Energy L × B comes from the walls: the same at any North (plan 2: 41
     const l = calculatePositiveLandEnergy(recalculateMetrics(PLAN2, true, rot), cal);
     assert.equal(l.length, 41.1);
     assert.equal(l.breadth, 31);
-    assert.equal(l.remainder, 0);
+    assert.equal(l.remainder, 8);
   }
 });
 test('typed plot size overrides the measured one; borderline remainders are flagged', () => {
   const m = recalculateMetrics(PLAN2, true, 0);
   const typed = calculatePositiveLandEnergy(m, null, { length: 41, breadth: 30.83 });
   assert.equal(typed.source, 'typed');
-  assert.equal(typed.remainder, 0);
+  assert.equal(typed.remainder, 8);
   const edge = calculatePositiveLandEnergy(m, null, { length: 40.3, breadth: 31.2 }); // 71.5 → borderline
   assert.equal(edge.borderline, true);
   assert.notEqual(edge.alternateRemainder, edge.remainder);

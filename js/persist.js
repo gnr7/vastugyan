@@ -80,7 +80,7 @@ export const startAutosave = (store, getImageBlob) => {
         return;
       }
       const record = {
-        version: 1,
+        version: 2,
         savedAt: Date.now(),
         polygon: state.polygon.map((p) => ({ x: p.x, y: p.y })),
         isPolygonClosed: state.isPolygonClosed,

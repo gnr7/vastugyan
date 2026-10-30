@@ -8,10 +8,11 @@ import {
   calculatePlotDimensions,
   findSelfIntersections,
   nearestWallAlignedAngle,
-  distance
+  distance,
+  rayPolygonHit
 } from './geometry.js';
 import { buildMandalaGrid, calculateMandalaMarma } from './mandala.js';
-import { computeDevtaSpatialFields } from './devtas.js';
+import { computeDevtaSpatialFields, outerCentreOfCode } from './devtas.js';
 import { calculate16DirectionalZones, calculateZoneAreas, calculate32EntranceGates } from './zones.js';
 
 // Initial state factory function
@@ -32,7 +33,7 @@ export const createInitialState = () => Object.freeze({
   draggingVertexIndex: null,
   hoverVertexIndex: null,
   cursorWorldPos: null,       // current mouse position in world coordinates
-  rotation: 0,                // 0 - 360 degrees
+  rotation: 0,                // compass bearing (0-360) the top of the plan faces; North sits this far anticlockwise of the top
   gridAlign: 'north',         // 'north': 9x9 grid turns with North · 'walls': grid stays on the plot's walls
   mandalaShape: 'plot',       // 'plot': rings follow the plot outline (as VastuGrid) · 'rect': classical rectangle
   elementStyle: 'classic',    // 'classic': NE is Water, NW is Space (as VastuGrid) · 'looseEarth': NE and NW are Loose Earth
@@ -67,7 +68,7 @@ export const createInitialState = () => Object.freeze({
     brahmasthan: null,        // { outline, area, pctOfPlot } — the real Brahmasthan on this plot
     boundaryError: null,      // 'self-intersecting' when the traced boundary crosses itself
     crossings: null,          // [[edgeIndex, edgeIndex], ...] for a crossing boundary
-    gridAngle: 0              // angle the 9x9 grid is laid at (North rotation or wall-aligned)
+    gridAngle: 0              // clockwise screen angle the 9x9 grid is laid at (with North, or wall-aligned)
   }),
   history: Object.freeze({
     past: Object.freeze([]),    // array of previous { polygon, isPolygonClosed } snapshots
@@ -151,24 +152,18 @@ const pointInPolygon = (poly, p) => {
   return c;
 };
 
-// A point a short step off a wall, on the side that is inside the plot
-const insideOfWall = (m, path, poly, stepLen) => {
-  let best = null;
-  for (let i = 1; i < (path || []).length; i++) {
-    const a = path[i - 1];
-    const b = path[i];
-    const len = Math.hypot(b.x - a.x, b.y - a.y);
-    if (len < 1e-9) continue;
-    const t = Math.max(0, Math.min(1, ((m.x - a.x) * (b.x - a.x) + (m.y - a.y) * (b.y - a.y)) / (len * len)));
-    const d = Math.hypot(a.x + (b.x - a.x) * t - m.x, a.y + (b.y - a.y) * t - m.y);
-    if (!best || d < best.d) best = { d, nx: -(b.y - a.y) / len, ny: (b.x - a.x) / len };
-  }
-  if (!best) return m;
-  for (const sign of [1, -1]) {
-    const p = { x: m.x + best.nx * stepLen * sign, y: m.y + best.ny * stepLen * sign };
+// A short step inside the wall, along a compass direction from the centre of the plot
+const insideOnBearing = (centroid, compassDeg, northDeg, poly, stepLen) => {
+  const rad = ((-90 + compassDeg + northDeg) * Math.PI) / 180;
+  const dir = { x: Math.cos(rad), y: Math.sin(rad) };
+  const hit = rayPolygonHit(poly, centroid, dir);
+  if (!hit) return null;
+  // The ray can run out through a cut in the plot on its way to the furthest wall: walk back in
+  for (let r = hit.dist - stepLen; r > 0; r -= stepLen) {
+    const p = { x: centroid.x + dir.x * r, y: centroid.y + dir.y * r };
     if (pointInPolygon(poly, p)) return p;
   }
-  return m;
+  return null;
 };
 
 const EMPTY_METRICS = {
@@ -189,8 +184,10 @@ const EMPTY_METRICS = {
 
 // Pure calculation of metrics, 9x9 grid, Devtas, and 16 Zones from polygon and rotation
 export const recalculateMetrics = (points, isClosed, rotation = 0, gridAlign = 'north', mandalaShape = 'plot') => {
+  // The geometry works with where North sits on screen, clockwise from the top of the plan
+  const northDeg = (360 - (((rotation % 360) + 360) % 360)) % 360;
   if (!points || points.length === 0) {
-    return Object.freeze({ ...EMPTY_METRICS, gridAngle: rotation });
+    return Object.freeze({ ...EMPTY_METRICS, gridAngle: northDeg });
   }
 
   const centroid = calculatePolygonCentroid(points);
@@ -199,7 +196,7 @@ export const recalculateMetrics = (points, isClosed, rotation = 0, gridAlign = '
   // A boundary that crosses itself has no meaningful area: report it instead of wrong numbers
   const crossings = isClosed && points.length >= 4 ? findSelfIntersections(points) : [];
   if (crossings.length > 0) {
-    return Object.freeze({ ...EMPTY_METRICS, centroid, bounds, gridAngle: rotation, boundaryError: 'self-intersecting', crossings });
+    return Object.freeze({ ...EMPTY_METRICS, centroid, bounds, gridAngle: northDeg, boundaryError: 'self-intersecting', crossings });
   }
 
   const hasPlot = isClosed && points.length >= 3;
@@ -207,23 +204,24 @@ export const recalculateMetrics = (points, isClosed, rotation = 0, gridAlign = '
 
   // The grid follows North, or the plot's walls (turned to the side facing nearest North)
   const gridAngle = (hasPlot && gridAlign === 'walls')
-    ? nearestWallAlignedAngle(calculatePlotOrientation(points), rotation)
-    : rotation;
+    ? nearestWallAlignedAngle(calculatePlotOrientation(points), northDeg)
+    : northDeg;
 
   const grid9x9 = (hasPlot && centroid) ? buildMandalaGrid(points, centroid, gridAngle, mandalaShape) : null;
-  const devtaFields = grid9x9 ? computeDevtaSpatialFields(grid9x9, rotation) : null;
-  const zonesBase = centroid ? calculate16DirectionalZones(centroid, bounds, rotation, grid9x9) : null;
+  const devtaFields = grid9x9 ? computeDevtaSpatialFields(grid9x9, northDeg) : null;
+  const zonesBase = centroid ? calculate16DirectionalZones(centroid, bounds, northDeg, grid9x9) : null;
   const zones16 = (hasPlot && zonesBase) ? calculateZoneAreas(zonesBase, points) : zonesBase;
   const entranceGates32 = (hasPlot && centroid)
-    ? calculate32EntranceGates(points, centroid, rotation, devtaFields)
+    ? calculate32EntranceGates(points, centroid, northDeg, devtaFields)
     : null;
-  // Outer Devtas are labelled on their entrance's own stretch of wall, just inside it (8/9 of the
-  // way out), so the label stays on the building even where a slice straddles a cut in the plot
+  // Outer Devtas are labelled on the centre line of their own slice, just inside the wall, so the
+  // label stays on the building even where a slice straddles a cut in the plot
   const step = 0.025 * Math.hypot(bounds.width, bounds.height);
-  const devtaFieldsPlaced = devtaFields && entranceGates32 && grid9x9.shape === 'plot'
+  const devtaFieldsPlaced = devtaFields && grid9x9.shape === 'plot'
     ? devtaFields.map((d) => {
-      const gate = d.entranceCode && entranceGates32.find((g) => g.code === d.entranceCode);
-      return gate && gate.edgeMidpoint ? { ...d, center: insideOfWall(gate.edgeMidpoint, gate.path, points, step) } : d;
+      if (!d.entranceCode) return d;
+      const label = insideOnBearing(centroid, outerCentreOfCode(d.entranceCode), northDeg, points, step);
+      return label ? { ...d, center: label } : d;
     })
     : devtaFields;
   const marmaSthan = grid9x9 ? calculateMandalaMarma(grid9x9) : null;
@@ -563,7 +561,9 @@ export const restoreProject = (saved) => (state) => {
   if (!saved) return state;
   const polygon = Object.freeze((saved.polygon || []).map((p) => ({ x: p.x, y: p.y })));
   const isPolygonClosed = !!saved.isPolygonClosed && polygon.length >= 3;
-  const rotation = ((Number(saved.rotation) || 0) % 360 + 360) % 360;
+  // Saves from before version 2 stored North's clockwise angle; the plan itself must not change
+  const savedRotation = saved.version === 1 ? -(Number(saved.rotation) || 0) : (Number(saved.rotation) || 0);
+  const rotation = (savedRotation % 360 + 360) % 360;
   const gridAlign = saved.gridAlign === 'walls' ? 'walls' : 'north';
   const calibration = saved.calibration && saved.calibration.realPerWorld > 0
     ? Object.freeze({ ...saved.calibration })

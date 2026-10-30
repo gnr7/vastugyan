@@ -61,7 +61,7 @@ export const AUSPICIOUS_ENTRANCES = new Set(['N3', 'N4', 'E3', 'E4', 'S3', 'S4',
  * Pure calculation of 16 Directional Zones with radial boundaries and sector geometry
  * @param {Object} centroid - { x, y } in world coordinates
  * @param {Object} bounds - Bounding box { minX, minY, maxX, maxY, width, height }
- * @param {number} angleDeg - Universal rotation in degrees
+ * @param {number} angleDeg - Where North sits on screen, clockwise from the top of the plan
  * @param {Object} grid9x9 - Optional 9x9 grid object
  */
 export const calculate16DirectionalZones = (centroid, bounds, angleDeg = 0, grid9x9 = null) => {
@@ -183,7 +183,7 @@ const polylineLength = (pts) => pts.slice(1).reduce((t, p, i) => t + distance(p,
  * courtyard plans where the centroid lies outside the building and a slice meets several walls.
  * @param {Array} points - Closed plot polygon in world coordinates
  * @param {Object} centroid - { x, y }
- * @param {number} angleDeg - Universal rotation (North) in degrees
+ * @param {number} angleDeg - Where North sits on screen, clockwise from the top of the plan
  * @param {Array} devtaFields - The 45 Devtas spatial fields (for gate names)
  */
 export const calculate32EntranceGates = (points, centroid, angleDeg = 0, devtaFields = null) => {

@@ -131,9 +131,9 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
       clientAddress ? `Address: ${clientAddress}` : ''
     ].filter(Boolean).join('  |  ');
     doc.text(details, 14, 22.5);
-    doc.text(`Generated: ${new Date().toLocaleDateString()} | True North Orientation: ${state.rotation}° | Mandala: 81 Padas (Paramasayika)`, 14, 26.5);
+    doc.text(`Generated: ${new Date().toLocaleDateString()} | Top of plan faces: ${state.rotation}° | Mandala: 81 Padas (Paramasayika)`, 14, 26.5);
   } else {
-    doc.text(`Generated: ${new Date().toLocaleDateString()} | True North Orientation: ${state.rotation}° | Mandala: 81 Padas (Paramasayika)`, 14, 25);
+    doc.text(`Generated: ${new Date().toLocaleDateString()} | Top of plan faces: ${state.rotation}° | Mandala: 81 Padas (Paramasayika)`, 14, 25);
   }
 
   // Divider
@@ -185,7 +185,7 @@ export const generatePdfReport = async (canvas, state, filename = '', clientInfo
 
   // Column 2
   doc.text(`Single Pada Area (1/81): ${formatArea(areaData.padaArea, cal)}`, 110, yPos + 16);
-  doc.text(`Universal Rotation: ${state.rotation}° · Grid ${state.gridAlign === 'walls' ? 'on plot walls' : 'turned with North'}`, 110, yPos + 23);
+  doc.text(`Top of plan faces: ${state.rotation}° · Grid ${state.gridAlign === 'walls' ? 'on plot walls' : 'turned with North'}`, 110, yPos + 23);
   doc.text(`Boundary Vertices: ${state.polygon.length} points (${state.isPolygonClosed ? 'Closed Polygon' : 'Draft'})`, 110, yPos + 30);
 
   // Executive Vastu Insights Box
