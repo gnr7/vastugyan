@@ -162,7 +162,12 @@ const GATE_FACES = [
   { prefix: 'S', category: 'outer_south', side: 'south', startDeg: 135 }, // S1 at SE → S8 at SW
   { prefix: 'W', category: 'outer_west',  side: 'west',  startDeg: 225 }  // W1 at SW → W8 at NW
 ];
-const GATE_SPAN_DEG = 360 / 32; // 11.25°
+export const GATE_SPAN_DEG = 360 / 32; // 11.25°
+
+// Every gate's name and centre bearing, in N1..N8, E1..E8, S1..S8, W1..W8 order
+export const GATE_RING = Object.freeze(GATE_FACES.flatMap(({ prefix, startDeg }) => (
+  Array.from({ length: 8 }, (_, i) => ({ label: `${prefix}${i + 1}`, bearing: startDeg + (i + 0.5) * GATE_SPAN_DEG }))
+)));
 
 // Brihat Samhita 53.72–75 (tr. N. Chidambaram Iyer, 1884): result of a door in each of the
 // 8 squares of a side, counted from the corner where that side's numbering starts

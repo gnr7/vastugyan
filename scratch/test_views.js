@@ -22,7 +22,7 @@ test('each view switches on exactly its own layers', () => {
   const s0 = createInitialState();
   assert.deepEqual(on(applyView('plan')(s0).layers), []);
   assert.deepEqual(on(applyView('mandala')(s0).layers), ['brahmasthan', 'devtaNames', 'devtas45', 'grid9x9']);
-  assert.deepEqual(on(applyView('zones')(s0).layers), ['compassWheel', 'elements']);
+  assert.deepEqual(on(applyView('zones')(s0).layers), ['elements', 'shaktiChakra']);
   assert.deepEqual(on(applyView('entrances')(s0).layers), ['gates32']);
   assert.deepEqual(on(applyView('marma')(s0).layers), ['brahmasthan', 'grid9x9', 'marma']);
 });

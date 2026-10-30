@@ -3,7 +3,7 @@
  */
 
 import { distance, findClosestVertex, rayPolygonHit } from './geometry.js';
-import { AUSPICIOUS_ENTRANCES, zoneTone } from './zones.js';
+import { AUSPICIOUS_ENTRANCES, GATE_RING, GATE_SPAN_DEG, zoneTone } from './zones.js';
 import {
   addPolygonVertex,
   closePolygon,
@@ -653,7 +653,7 @@ export const draw16Zones = (ctx, zones16, scale, layers, plot = null, style = 'c
   }
 
   // Labels go on the shared board. Element names always show, sliding along their own direction
-  // when their spot is taken; zone names are left to the ring when the compass wheel is on.
+  // when their spot is taken; zone names are left to the ring when the Shakti Chakra is on.
   if (!board) return;
   if (layers.elements) {
     const groups = [];
@@ -675,7 +675,7 @@ export const draw16Zones = (ctx, zones16, scale, layers, plot = null, style = 'c
       board.add({ text: look.label, x, y, alts: [0.36, 0.64, 0.24, 0.76].map(spot), px: 12.5, weight: 700, color: look.color, priority: LABEL_PRIORITY.element, force: true });
     });
   }
-  if (layers.zones16 && !layers.compassWheel) {
+  if (layers.zones16 && !layers.shaktiChakra) {
     zones.forEach((z) => {
       const d = hitDistance(z.centerRad) * (closed ? 0.78 : 0.92);
       board.add({ text: z.short, x: centroid.x + Math.cos(z.centerRad) * d, y: centroid.y + Math.sin(z.centerRad) * d, px: 11, color: z.color, priority: LABEL_PRIORITY.zone });
@@ -683,12 +683,18 @@ export const draw16Zones = (ctx, zones16, scale, layers, plot = null, style = 'c
   }
 };
 
-// Compass wheel: a ring just outside the plot, as practitioners draw it on paper, so the plan
-// itself stays clear. Its size depends only on the plot, so fitting the view can allow for it.
-export const compassWheelRadii = (plot, centroid) => {
+// Shakti Chakra: the degree dial practitioners lay over a plan. From the outside in: degrees, life
+// aspects, 32 gates, the 16 zones in element colours, then spokes across the plan. At size 1 the
+// rings just clear the plot's farthest corner; smaller sizes let them overlap the plan.
+// Its size depends only on the plot, so fitting the view can allow for it.
+const CHAKRA_RING_EDGE = { degrees: 0.905, lifeAspects: 0.775, gates: 0.7, zones: 0.62 }; // inner edges, as a share of the outer radius
+const CHAKRA_PAPER = 'rgba(255, 253, 247, 0.86)';
+const CHAKRA_INK = '#2A1F17';
+
+export const shaktiChakraRadii = (plot, centroid, size = 1) => {
   const far = Math.max(...plot.map((p) => distance(p, centroid)));
-  const inner = far * 1.08;
-  return { inner, outer: inner + far * 0.2 };
+  const inner = far * 1.04 * size;
+  return { inner, outer: inner / CHAKRA_RING_EDGE.zones };
 };
 
 const WHEEL_STYLE = {
@@ -701,86 +707,133 @@ const WHEEL_STYLE = {
   Space: { fill: '#A7A1B3', text: '#FFFFFF' }
 };
 
-export const drawCompassWheel = (ctx, zones16, scale, plot, style = 'classic', rotationDeg = 0, board = null) => {
+// One or two lines of text on the dial, turned so they never read upside down
+const drawChakraText = (ctx, centroid, rad, r, lines, { px, weight = 600, color = CHAKRA_INK, maxWidth = Infinity }) => {
+  const bottomHalf = Math.sin(rad) > 0.0001;
+  ctx.save();
+  ctx.translate(centroid.x + Math.cos(rad) * r, centroid.y + Math.sin(rad) * r);
+  ctx.rotate(rad + (bottomHalf ? -Math.PI / 2 : Math.PI / 2));
+  ctx.font = `${weight} ${px}px 'Hanken Grotesk', sans-serif`;
+  const widest = Math.max(...lines.map((line) => ctx.measureText(line).width));
+  if (widest > maxWidth) ctx.font = `${weight} ${(px * maxWidth) / widest}px 'Hanken Grotesk', sans-serif`;
+  ctx.fillStyle = color;
+  lines.forEach((line, i) => ctx.fillText(line, 0, (i - (lines.length - 1) / 2) * px * 1.18));
+  ctx.restore();
+};
+
+export const drawShaktiChakra = (ctx, zones16, scale, plot, style = 'classic', rotationDeg = 0, board = null, size = 1) => {
   if (!zones16 || !zones16.zones || zones16.zones.length !== 16 || !plot || plot.length < 3) return;
   const { centroid, zones } = zones16;
-  const { inner, outer } = compassWheelRadii(plot, centroid);
+  const north = zones.find((z) => z.id === 'N');
+  if (!north) return;
+  const { outer } = shaktiChakraRadii(plot, centroid, size);
+  const edge = {
+    degrees: outer * CHAKRA_RING_EDGE.degrees,
+    lifeAspects: outer * CHAKRA_RING_EDGE.lifeAspects,
+    gates: outer * CHAKRA_RING_EDGE.gates,
+    zones: outer * CHAKRA_RING_EDGE.zones
+  };
   const at = (rad, r) => ({ x: centroid.x + Math.cos(rad) * r, y: centroid.y + Math.sin(rad) * r });
+  const radOf = (bearing) => north.centerRad + (bearing * Math.PI) / 180;
+  const addRadialLine = (rad, from, to) => {
+    const a = at(rad, from);
+    const b = at(rad, to);
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+  };
+  const addCircle = (r) => {
+    ctx.moveTo(centroid.x + r, centroid.y);
+    ctx.arc(centroid.x, centroid.y, r, 0, Math.PI * 2);
+  };
 
   ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
 
-  // Spokes from the walls out to the ring, on every zone boundary
+  // Across the plan: faint gate lines and inner circles, firmer lines on the zone boundaries
   ctx.beginPath();
-  zones.forEach((z) => {
-    const dir = { x: Math.cos(z.startRad), y: Math.sin(z.startRad) };
-    const hit = rayPolygonHit(plot, centroid, dir);
-    const from = at(z.startRad, hit ? hit.dist : 0);
-    const to = at(z.startRad, inner);
-    ctx.moveTo(from.x, from.y);
-    ctx.lineTo(to.x, to.y);
-  });
-  ctx.strokeStyle = 'rgba(42, 31, 23, 0.4)';
+  GATE_RING.forEach((gate) => addRadialLine(radOf(gate.bearing - GATE_SPAN_DEG / 2), 0, edge.zones));
+  addCircle(edge.zones * 0.34);
+  addCircle(edge.zones * 0.68);
+  ctx.strokeStyle = 'rgba(42, 31, 23, 0.16)';
   ctx.lineWidth = 1 / scale;
   ctx.stroke();
+  ctx.beginPath();
+  zones.forEach((z) => addRadialLine(z.startRad, 0, edge.zones));
+  ctx.strokeStyle = 'rgba(42, 31, 23, 0.42)';
+  ctx.stroke();
 
-  // Ring sectors in element colours, with white seams
+  // The paper the outer rings are printed on, leaving the plan showing faintly behind it
+  ctx.beginPath();
+  addCircle(outer);
+  addCircle(edge.gates);
+  ctx.fillStyle = CHAKRA_PAPER;
+  ctx.fill('evenodd');
+
+  // Degree scale: every degree when there is room for it, longer ticks at 5° and 10°
+  const roomForEveryDegree = (outer * scale * Math.PI) / 180 >= 2.2;
+  ctx.beginPath();
+  for (let d = 0; d < 360; d++) {
+    if (d % 10 === 0) addRadialLine(radOf(d), outer * 0.955, outer);
+    else if (d % 5 === 0) addRadialLine(radOf(d), outer * 0.97, outer);
+    else if (roomForEveryDegree) addRadialLine(radOf(d), outer * 0.985, outer);
+  }
+  ctx.strokeStyle = CHAKRA_INK;
+  ctx.lineWidth = 0.6 / scale;
+  ctx.stroke();
+  for (let d = 0; d < 360; d += 10) {
+    drawChakraText(ctx, centroid, radOf(d), outer * 0.93, [String(d)], { px: outer * 0.036 });
+  }
+
+  // Life aspects and 32 gates, with their dividers and the circles between the rings
+  ctx.beginPath();
+  zones.forEach((z) => addRadialLine(z.startRad, edge.lifeAspects, edge.degrees));
+  GATE_RING.forEach((gate) => addRadialLine(radOf(gate.bearing - GATE_SPAN_DEG / 2), edge.gates, edge.lifeAspects));
+  addCircle(outer);
+  addCircle(edge.degrees);
+  addCircle(edge.lifeAspects);
+  ctx.strokeStyle = 'rgba(42, 31, 23, 0.6)';
+  ctx.lineWidth = 1 / scale;
+  ctx.stroke();
+  zones.forEach((z) => {
+    const lines = z.attribute.includes(' & ') ? z.attribute.split(' & ') : z.attribute.split(' ');
+    drawChakraText(ctx, centroid, z.centerRad, (edge.lifeAspects + edge.degrees) / 2, lines, { px: outer * 0.036, maxWidth: outer * 0.3 });
+  });
+  GATE_RING.forEach((gate) => {
+    drawChakraText(ctx, centroid, radOf(gate.bearing), (edge.gates + edge.lifeAspects) / 2, [gate.label], { px: outer * 0.036, weight: 700 });
+  });
+
+  // The 16 zones in element colours, with white seams
   zones.forEach((z) => {
     const look = WHEEL_STYLE[zoneTone(z.id, style) || z.element];
     ctx.beginPath();
-    ctx.arc(centroid.x, centroid.y, outer, z.startRad, z.endRad, false);
-    ctx.arc(centroid.x, centroid.y, inner, z.endRad, z.startRad, true);
+    ctx.arc(centroid.x, centroid.y, edge.gates, z.startRad, z.endRad, false);
+    ctx.arc(centroid.x, centroid.y, edge.zones, z.endRad, z.startRad, true);
     ctx.closePath();
     ctx.fillStyle = look.fill;
     ctx.fill();
     ctx.strokeStyle = '#FFFFFF';
     ctx.lineWidth = 1.5 / scale;
     ctx.stroke();
+    drawChakraText(ctx, centroid, z.centerRad, (edge.zones + edge.gates) / 2, [z.short], { px: outer * 0.04, weight: 700, color: look.text });
   });
+
+  // North: a pointer on the inside of the rings and the angle beside it
+  const pointer = outer * 0.034;
+  const tip = at(north.centerRad, edge.zones);
+  const back = at(north.centerRad, edge.zones - pointer);
+  const side = { x: -Math.sin(north.centerRad) * pointer * 0.55, y: Math.cos(north.centerRad) * pointer * 0.55 };
   ctx.beginPath();
-  ctx.arc(centroid.x, centroid.y, outer, 0, Math.PI * 2);
-  ctx.moveTo(centroid.x + inner, centroid.y);
-  ctx.arc(centroid.x, centroid.y, inner, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(42, 31, 23, 0.45)';
-  ctx.lineWidth = 1 / scale;
-  ctx.stroke();
-
-  // Zone names along the ring, turned so they never read upside down
-  const mid = (inner + outer) / 2;
-  const fontWorld = (outer - inner) * 0.42;
-  ctx.font = `400 ${fontWorld}px 'Marcellus', serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  zones.forEach((z) => {
-    const p = at(z.centerRad, mid);
-    const bottomHalf = Math.sin(z.centerRad) > 0.0001;
-    ctx.save();
-    ctx.translate(p.x, p.y);
-    ctx.rotate(z.centerRad + (bottomHalf ? -Math.PI / 2 : Math.PI / 2));
-    ctx.fillStyle = WHEEL_STYLE[zoneTone(z.id, style) || z.element].text;
-    ctx.fillText(z.short, 0, 0);
-    ctx.restore();
-  });
-
-  // North: a pointer on the inside of the ring and the angle beside it, so nothing crosses the plan
-  const north = zones.find((z) => z.id === 'N');
-  if (north) {
-    const nRad = north.centerRad;
-    const tip = at(nRad, inner);
-    const size = (outer - inner) * 0.42;
-    const back = at(nRad, inner - size);
-    const side = { x: -Math.sin(nRad) * size * 0.55, y: Math.cos(nRad) * size * 0.55 };
-    ctx.beginPath();
-    ctx.moveTo(tip.x, tip.y);
-    ctx.lineTo(back.x + side.x, back.y + side.y);
-    ctx.lineTo(back.x - side.x, back.y - side.y);
-    ctx.closePath();
-    ctx.fillStyle = THEME.kumkum;
-    ctx.fill();
-    if (board) {
-      const deg = Math.round((((rotationDeg % 360) + 360) % 360) * 10) / 10;
-      const label = at(nRad, inner - size * 2.4);
-      board.add({ text: `N ${deg}°`, x: label.x, y: label.y, px: 11.5, weight: 700, pill: { fill: THEME.kumkum, text: '#FFFFFF' }, priority: LABEL_PRIORITY.north, force: true });
-    }
+  ctx.moveTo(tip.x, tip.y);
+  ctx.lineTo(back.x + side.x, back.y + side.y);
+  ctx.lineTo(back.x - side.x, back.y - side.y);
+  ctx.closePath();
+  ctx.fillStyle = THEME.kumkum;
+  ctx.fill();
+  if (board) {
+    const deg = Math.round((((rotationDeg % 360) + 360) % 360) * 10) / 10;
+    const label = at(north.centerRad, edge.zones - pointer * 2.4);
+    board.add({ text: `N ${deg}°`, x: label.x, y: label.y, px: 11.5, weight: 700, pill: { fill: THEME.kumkum, text: '#FFFFFF' }, priority: LABEL_PRIORITY.north, force: true });
   }
 
   ctx.restore();
@@ -962,11 +1015,11 @@ export const drawCalibration = (ctx, state) => {
   ctx.restore();
 };
 
-// Grow a content box so the compass wheel, when shown, fits on screen and in exports
+// Grow a content box so the Shakti Chakra, when shown, fits on screen and in exports
 const withWheelRoom = (state, box) => {
   const zones16 = state.metrics.zones16;
-  if (!state.layers.compassWheel || !state.isPolygonClosed || !zones16 || !zones16.centroid) return box;
-  const { outer } = compassWheelRadii(state.polygon, zones16.centroid);
+  if (!state.layers.shaktiChakra || !state.isPolygonClosed || !zones16 || !zones16.centroid) return box;
+  const { outer } = shaktiChakraRadii(state.polygon, zones16.centroid, state.chakraSize);
   const c = zones16.centroid;
   const minX = Math.min(box.originX, c.x - outer);
   const minY = Math.min(box.originY, c.y - outer);
@@ -1736,9 +1789,9 @@ export class CanvasController {
       drawMarmaSthan(ctx, state.metrics.marmaSthan, scale, L);
     }
 
-    // 9b. Compass wheel around the plot
-    if (L.compassWheel && plot && state.metrics.zones16) {
-      drawCompassWheel(ctx, state.metrics.zones16, scale, plot, state.elementStyle, state.rotation, board);
+    // 9b. Shakti Chakra around the plot
+    if (L.shaktiChakra && plot && state.metrics.zones16) {
+      drawShaktiChakra(ctx, state.metrics.zones16, scale, plot, state.elementStyle, state.rotation, board, state.chakraSize);
     }
 
     // 10. Boundary, corner handles and the centre

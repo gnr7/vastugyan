@@ -20,6 +20,7 @@ import {
   restoreProject,
   setMandalaShape,
   setElementStyle,
+  setChakraSize,
   applyView,
   currentView,
   setLandDimensions,
@@ -141,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
     marma: document.getElementById('toggleMarma'),
     vithi: document.getElementById('toggleVithi'),
     elements: document.getElementById('toggleElements'),
-    compassWheel: document.getElementById('toggleCompassWheel'),
+    shaktiChakra: document.getElementById('toggleShaktiChakra'),
     gatePadas: document.getElementById('toggleGatePadas')
   };
 
@@ -393,9 +394,9 @@ document.addEventListener('DOMContentLoaded', () => {
     checkbox.addEventListener('change', (e) => {
       store.setState(toggleLayer(layerKey, e.target.checked));
       const { layers } = store.getState();
-      // The wheel sits outside the plot, so make room for it (and give the room back)
-      if (layerKey === 'compassWheel') canvasController.fitToView();
-      if ((layerKey === 'elements' || layerKey === 'compassWheel') && e.target.checked && !elementsTipShown && (layers.devtas45 || layers.devtaNames)) {
+      // The chakra sits outside the plot, so make room for it (and give the room back)
+      if (layerKey === 'shaktiChakra') canvasController.fitToView();
+      if ((layerKey === 'elements' || layerKey === 'shaktiChakra') && e.target.checked && !elementsTipShown && (layers.devtas45 || layers.devtaNames)) {
         elementsTipShown = true;
         ui.showToast('Tip: switch off Devtas for a clearer elements view', { duration: 4200 });
       }
@@ -415,6 +416,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const elementStyleButtons = document.querySelectorAll('[data-element-style]');
   elementStyleButtons.forEach((btn) => {
     btn.addEventListener('click', () => store.setState(setElementStyle(btn.dataset.elementStyle)));
+  });
+
+  // Shakti Chakra size: frame the result, as switching it on does
+  const chakraSizeButtons = document.querySelectorAll('[data-chakra-size]');
+  chakraSizeButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      store.setState(setChakraSize(Number(btn.dataset.chakraSize)));
+      canvasController.fitToView();
+    });
   });
 
   // 7. Draw Boundary Toggle Button
@@ -690,6 +700,11 @@ document.addEventListener('DOMContentLoaded', () => {
     elementStyleButtons.forEach((btn) => {
       btn.setAttribute('aria-checked', String(btn.dataset.elementStyle === state.elementStyle));
     });
+    chakraSizeButtons.forEach((btn) => {
+      btn.setAttribute('aria-checked', String(Number(btn.dataset.chakraSize) === state.chakraSize));
+    });
+    const chakraSizeRow = document.getElementById('chakraSizeRow');
+    if (chakraSizeRow) chakraSizeRow.style.display = state.layers.shaktiChakra ? 'flex' : 'none';
     const view = currentView(state.layers);
     viewButtons.forEach((btn) => btn.setAttribute('aria-checked', String(btn.dataset.view === view)));
     const elementStyleNote = document.getElementById('elementStyleNote');

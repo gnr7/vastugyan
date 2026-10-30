@@ -293,13 +293,26 @@
                 </span>
               </label>
               <label class="layer-tile">
-                <input type="checkbox" id="toggleCompassWheel">
+                <input type="checkbox" id="toggleShaktiChakra">
                 <span class="layer-body">
                   <svg class="layer-glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/><path d="M12 8.5v7" class="glyph-north"/></svg>
-                  <span class="layer-name">Compass wheel</span>
-                  <span class="layer-sub">Zones ring + North</span>
+                  <span class="layer-name">Shakti Chakra</span>
+                  <span class="layer-sub">Degrees, gates, zones</span>
                 </span>
               </label>
+            </div>
+            <div class="style-row" id="chakraSizeRow" style="display: none">
+              <span class="switch-text">
+                <span class="switch-label">Shakti Chakra size</span>
+                <span class="switch-sub">Fit keeps the rings clear of the plot</span>
+              </span>
+              <div class="seg-control" role="radiogroup" aria-label="Shakti Chakra size">
+                <button type="button" role="radio" data-chakra-size="0.6" aria-checked="false">60%</button>
+                <button type="button" role="radio" data-chakra-size="0.8" aria-checked="false">80%</button>
+                <button type="button" role="radio" data-chakra-size="1" aria-checked="true">Fit</button>
+                <button type="button" role="radio" data-chakra-size="1.25" aria-checked="false">125%</button>
+                <button type="button" role="radio" data-chakra-size="1.5" aria-checked="false">150%</button>
+              </div>
             </div>
             <div class="style-row">
               <span class="switch-text">

@@ -216,6 +216,7 @@ Open-source, local-first Vastu Shastra analysis web application inspired by prof
   22. Clean plan: one-tap views (Plan, Mandala, Zones, Entrances, Marma), one shared label board with priorities (plain text with a halo, pills only for elements, auspicious entrances and North), one colour fill at a time, no duplicate labels, North pointer kept in the ring; always opens in light mode with a dark toggle in the top bar
   23. Zoom that keeps the plan in view: zoom-out stops at 85% of the fitted size and glides the plan back to the centre, panning and zooming in keep part of the plan on screen, the +/- buttons zoom around the visible centre, and double-tap or double-click fits the plan
   24. Fixes from a live side-by-side with VastuGrid: the North number is now the compass bearing the top of the plan faces (saved projects convert automatically), the 32 outer Devtas are centred on the compass points, and land energy reads even remainders as positive, odd as negative, exact division as 8
+  25. Shakti Chakra replaces the Compass wheel: drawn in code with a degree scale, life aspects, 32 gates, coloured 16 zones and spokes (ring order as VastuGrid, gates and labels as the app's own data), sizes 60% to 150% with Fit keeping the rings clear of the plot, and old saves carry over
 - All features from the original wish list are built. **Awaiting user review** before anything further.
 
 

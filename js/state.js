@@ -37,6 +37,7 @@ export const createInitialState = () => Object.freeze({
   gridAlign: 'north',         // 'north': 9x9 grid turns with North · 'walls': grid stays on the plot's walls
   mandalaShape: 'plot',       // 'plot': rings follow the plot outline (as VastuGrid) · 'rect': classical rectangle
   elementStyle: 'classic',    // 'classic': NE is Water, NW is Space (as VastuGrid) · 'looseEarth': NE and NW are Loose Earth
+  chakraSize: 1,              // Shakti Chakra size, as a share of the size that just clears the plot (see CHAKRA_SIZES)
   landDims: null,             // { length, breadth } in feet typed by the user, or null to measure from the walls
   calibration: null,          // { realPerWorld, unit: 'ft' | 'm', realLength } once Set Scale is applied
   isCalibrating: false,
@@ -52,7 +53,7 @@ export const createInitialState = () => Object.freeze({
     marma: false,
     vithi: false,
     elements: false,
-    compassWheel: false
+    shaktiChakra: false
   }),
   metrics: Object.freeze({
     area: 0,
@@ -266,12 +267,12 @@ export const setMandalaShape = (shape) => (state) => {
 // One-tap views: each shows only the layers that belong together, so the plan never piles up
 const LAYERS_OFF = {
   grid9x9: false, brahmasthan: false, devtas45: false, devtaNames: false, zones16: false,
-  gates32: false, gatePadas: false, marma: false, vithi: false, elements: false, compassWheel: false
+  gates32: false, gatePadas: false, marma: false, vithi: false, elements: false, shaktiChakra: false
 };
 export const VIEWS = {
   plan: {},
   mandala: { grid9x9: true, brahmasthan: true, devtas45: true, devtaNames: true },
-  zones: { compassWheel: true, elements: true },
+  zones: { shaktiChakra: true, elements: true },
   entrances: { gates32: true },
   marma: { grid9x9: true, brahmasthan: true, marma: true }
 };
@@ -292,6 +293,14 @@ export const setElementStyle = (style) => (state) => {
   const elementStyle = style === 'looseEarth' ? 'looseEarth' : 'classic';
   if (elementStyle === state.elementStyle) return state;
   return { ...state, elementStyle };
+};
+
+// Shakti Chakra sizes offered in the Layers panel; 1 just clears the plot
+export const CHAKRA_SIZES = Object.freeze([0.6, 0.8, 1, 1.25, 1.5]);
+export const setChakraSize = (size) => (state) => {
+  const chakraSize = CHAKRA_SIZES.includes(size) ? size : 1;
+  if (chakraSize === state.chakraSize) return state;
+  return { ...state, chakraSize };
 };
 
 // Plot length and breadth typed by the user (feet) for Land Energy, or null to measure from the walls
@@ -568,9 +577,13 @@ export const restoreProject = (saved) => (state) => {
   const calibration = saved.calibration && saved.calibration.realPerWorld > 0
     ? Object.freeze({ ...saved.calibration })
     : null;
-  const layers = Object.freeze({ ...state.layers, ...(saved.layers || {}) });
+  // Older saves called the Shakti Chakra layer the compass wheel
+  const { compassWheel, ...savedLayers } = saved.layers || {};
+  if (compassWheel !== undefined && savedLayers.shaktiChakra === undefined) savedLayers.shaktiChakra = compassWheel;
+  const layers = Object.freeze({ ...state.layers, ...savedLayers });
   const mandalaShape = saved.mandalaShape === 'rect' ? 'rect' : 'plot';
   const elementStyle = saved.elementStyle === 'looseEarth' ? 'looseEarth' : 'classic';
+  const chakraSize = CHAKRA_SIZES.includes(saved.chakraSize) ? saved.chakraSize : 1;
   const landDims = saved.landDims && saved.landDims.length > 0 && saved.landDims.breadth > 0 ? Object.freeze({ ...saved.landDims }) : null;
   return {
     ...state,
@@ -580,6 +593,7 @@ export const restoreProject = (saved) => (state) => {
     gridAlign,
     mandalaShape,
     elementStyle,
+    chakraSize,
     landDims,
     calibration,
     layers,
