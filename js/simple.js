@@ -20,19 +20,66 @@ import {
   applyCalibration,
   restoreProject,
   setChakraSize,
+  setMandalaShape,
+  setGridAlign,
+  setElementStyle,
+  setLandDimensions,
+  applyView,
+  currentView,
   commitRotationHistory
 } from './state.js';
+import { ELEMENT_STYLES } from './zones.js';
 import { CanvasController, refreshTheme } from './canvas.js';
-import { calculateAreaMetrics, calculatePositiveLandEnergy, calculate16BarChart, formatArea, formatLength } from './analysis.js';
+import {
+  calculateAreaMetrics,
+  calculatePositiveLandEnergy,
+  calculatePanchTatvaSummary,
+  calculateVithiSummary,
+  calculate16BarChart,
+  formatArea,
+  formatLength
+} from './analysis.js';
 import { draw16BarChart } from './barchart.js';
-import { exportCanvasToPng, generatePdfReport } from './export.js';
+import { exportCanvasToPng, generatePdfReport, deliverFile } from './export.js';
 import { loadProject, clearProject, startAutosave } from './persist.js';
+
+// What each Vithi ring suits, from the centre out (same wording as the full app)
+const VITHI_USE = {
+  brahma: 'The sacred centre. Keep it open and light, free of pillars, walls, toilets and heavy loads.',
+  daivika: 'Ring of the devas. Suits prayer, quiet sitting and light, open use.',
+  manushya: 'Ring of people. The natural place for living, dining, bedrooms and daily life.',
+  paishachika: 'The outer ring. Traditionally for boundary walls, storage, stairs and service rooms.'
+};
 
 document.addEventListener('DOMContentLoaded', () => {
   const $ = (id) => document.getElementById(id);
   const store = createStore(createInitialState());
   refreshTheme();
   const canvasController = new CanvasController($('planCanvas'), store);
+
+  // Light unless dark was chosen; the choice is shared with the full app
+  const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+  const applyTheme = (theme) => {
+    const dark = theme === 'dark';
+    if (dark) document.documentElement.dataset.theme = 'dark';
+    else delete document.documentElement.dataset.theme;
+    if (themeColorMeta) themeColorMeta.content = dark ? '#0F141B' : '#F4F6F9';
+    $('btnTheme').querySelector('use').setAttribute('href', dark ? '#s-sun' : '#s-moon');
+    $('btnTheme').title = dark ? 'Light mode' : 'Dark mode';
+    $('btnTheme').setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    refreshTheme();
+    canvasController.render(store.getState());
+  };
+  applyTheme(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
+  $('btnTheme').addEventListener('click', () => {
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    try {
+      localStorage.setItem('vg-theme', next);
+    } catch {
+      /* private mode: the choice just isn't remembered */
+    }
+    applyTheme(next);
+  });
 
   let currentImageBlob = null; // the plan as used (after any turn or crop), kept for autosave
   let restoring = false;       // no step-by-step messages while a saved project loads
@@ -85,12 +132,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ---------- 1. Choose a plan ----------
   const fileInput = $('fileInput');
+  const cameraInput = $('cameraInput');
   const dropZone = $('dropZone');
   dropZone.addEventListener('click', () => fileInput.click());
-  fileInput.addEventListener('change', (e) => {
+  $('btnNewPlan').addEventListener('click', () => fileInput.click());
+  document.querySelectorAll('[data-action="camera"]').forEach((b) => b.addEventListener('click', () => cameraInput.click()));
+  [fileInput, cameraInput].forEach((input) => input.addEventListener('change', (e) => {
     if (e.target.files && e.target.files[0]) openPreview(e.target.files[0]);
     e.target.value = '';
-  });
+  }));
   dropZone.addEventListener('dragover', (e) => {
     e.preventDefault();
     dropZone.classList.add('is-over');
@@ -99,6 +149,18 @@ document.addEventListener('DOMContentLoaded', () => {
   dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
     dropZone.classList.remove('is-over');
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) openPreview(e.dataTransfer.files[0]);
+  });
+
+  const stageBox = $('stage');
+  stageBox.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    stageBox.classList.add('is-over');
+  });
+  stageBox.addEventListener('dragleave', () => stageBox.classList.remove('is-over'));
+  stageBox.addEventListener('drop', (e) => {
+    e.preventDefault();
+    stageBox.classList.remove('is-over');
     if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) openPreview(e.dataTransfer.files[0]);
   });
 
@@ -111,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ---------- 2. Turn or crop before starting ----------
   const previewCanvas = $('previewCanvas');
-  const preview = { file: null, work: null, degrees: 0, changed: false, cropping: false, rect: null, start: null, scale: 1 };
+  const preview = { file: null, work: null, degrees: 0, changed: false, cropping: false, rect: null, start: null, scale: 1, from: 'upload' };
 
   const imageToCanvas = (img) => {
     const c = document.createElement('canvas');
@@ -170,7 +232,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const img = new Image();
     img.onload = () => {
       URL.revokeObjectURL(url);
-      Object.assign(preview, { file, work: imageToCanvas(img), degrees: 0, changed: false });
+      // A plan chosen from the work screen replaces the current one, so Cancel goes back there
+      const from = steps.work.hidden ? 'upload' : 'work';
+      Object.assign(preview, { file, work: imageToCanvas(img), degrees: 0, changed: false, from });
       $('previewDeg').textContent = '0°';
       showStep('preview');
       setCropping(false);
@@ -252,11 +316,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   $('btnPreviewCancel').addEventListener('click', () => {
     preview.work = null;
-    showStep('upload');
+    showStep(preview.from);
   });
 
   $('btnPreviewUse').addEventListener('click', async () => {
     const { file } = preview;
+    const current = store.getState();
+    if (preview.from === 'work' && (current.polygon.length > 0 || current.image)
+      && !window.confirm('Use this as a new plan? The current plan and its boundary will be replaced.')) return;
     let blob = file;
     if (preview.changed) {
       const type = file.type === 'image/jpeg' ? 'image/jpeg' : 'image/png';
@@ -312,7 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btnZoomReset').addEventListener('click', () => canvasController.fitToView());
 
   // Start again with another plan
-  $('btnStartOver').addEventListener('click', () => {
+  const startOver = () => {
     if (!window.confirm('Remove this plan and start again?')) return;
     currentImageBlob = null;
     drawnHere = false;
@@ -322,7 +389,9 @@ document.addEventListener('DOMContentLoaded', () => {
     store.setState(resetAll());
     setPlanLabel('Blank page', null);
     showStep('upload');
-  });
+  };
+  $('btnStartOver').addEventListener('click', startOver);
+  $('btnStartOverFull').addEventListener('click', startOver);
 
   // ---------- Exports ----------
   $('btnPng').addEventListener('click', () => {
@@ -365,9 +434,14 @@ document.addEventListener('DOMContentLoaded', () => {
     scaleModal.hidden = true;
     store.setState(applyCalibration(length, $('scaleUnit').value));
   };
-  $('btnSetScale').addEventListener('click', () => {
+  const startScale = () => {
     store.setState(setCalibrationMode(true));
     $('stage').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+  $('btnSetScale').addEventListener('click', startScale);
+  $('btnScaleTool').addEventListener('click', () => {
+    if (store.getState().isCalibrating) cancelScale();
+    else startScale();
   });
   $('btnScaleCancel').addEventListener('click', cancelScale);
   $('btnScaleModalCancel').addEventListener('click', cancelScale);
@@ -376,6 +450,81 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Enter') applyScale();
     if (e.key === 'Escape') cancelScale();
   });
+
+  // ---------- Land energy: plot size from the documents ----------
+  const landModal = $('landModal');
+  const closeLand = () => { landModal.hidden = true; };
+  $('btnLandDims').addEventListener('click', () => {
+    const st = store.getState();
+    const land = calculatePositiveLandEnergy(st.metrics, st.calibration, st.landDims);
+    $('landLength').value = st.landDims ? st.landDims.length : (land.isActive ? land.length : '');
+    $('landBreadth').value = st.landDims ? st.landDims.breadth : (land.isActive ? land.breadth : '');
+    landModal.hidden = false;
+    setTimeout(() => $('landLength').focus(), 50);
+  });
+  $('btnLandCancel').addEventListener('click', closeLand);
+  $('btnLandMeasured').addEventListener('click', () => {
+    store.setState(setLandDimensions(null));
+    closeLand();
+  });
+  $('btnLandApply').addEventListener('click', () => {
+    const length = parseFloat($('landLength').value);
+    const breadth = parseFloat($('landBreadth').value);
+    if (!(length > 0) || !(breadth > 0)) {
+      (length > 0 ? $('landBreadth') : $('landLength')).focus();
+      return;
+    }
+    store.setState(setLandDimensions({ length, breadth }));
+    closeLand();
+  });
+
+  // Fold-open sections remember whether they were open (only on this device)
+  const OPEN_KEY = 'vg-simple-open';
+  let openPanels = {};
+  try {
+    openPanels = JSON.parse(localStorage.getItem(OPEN_KEY) || '{}') || {};
+  } catch {
+    openPanels = {};
+  }
+  document.querySelectorAll('[data-opens]').forEach((box) => {
+    const panel = $(box.dataset.opens);
+    box.checked = !!openPanels[box.dataset.opens];
+    panel.hidden = !box.checked;
+    box.addEventListener('change', () => {
+      panel.hidden = !box.checked;
+      openPanels[box.dataset.opens] = box.checked;
+      try {
+        localStorage.setItem(OPEN_KEY, JSON.stringify(openPanels));
+      } catch {
+        /* private mode: the choice just isn't remembered */
+      }
+      sync(store.getState());
+    });
+  });
+
+  // Settings
+  $('toggleMandalaPlot').addEventListener('change', (e) => store.setState(setMandalaShape(e.target.checked ? 'plot' : 'rect')));
+  $('toggleGridWalls').addEventListener('change', (e) => store.setState(setGridAlign(e.target.checked ? 'walls' : 'north')));
+  const elementStyleButtons = [...document.querySelectorAll('[data-element-style]')];
+  elementStyleButtons.forEach((btn) => btn.addEventListener('click', () => store.setState(setElementStyle(btn.dataset.elementStyle))));
+
+  // Install on the home screen, where the browser offers it
+  let installPrompt = null;
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    installPrompt = e;
+    $('btnInstall').hidden = false;
+  });
+  $('btnInstall').addEventListener('click', async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    installPrompt = null;
+    $('btnInstall').hidden = true;
+    if (choice.outcome === 'accepted') showToast('Installed. Open it from your home screen.');
+  });
+  if (!isStandalone && /iphone|ipad|ipod/i.test(navigator.userAgent)) $('iosInstallHint').hidden = false;
 
   // ---------- Universal Rotation ----------
   const rotationSlider = $('rotationSlider');
@@ -405,6 +554,77 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btnRotMinus').addEventListener('click', () => nudge(-1));
   $('btnRotPlus').addEventListener('click', () => nudge(1));
   $('btnRotReset').addEventListener('click', () => nudge(-store.getState().rotation));
+
+  // Compass on the plan: drag to turn North, tap to type the exact angle
+  const dial = $('compassDial');
+  const ticks = dial.querySelector('.s-dial-ticks');
+  for (let i = 1; i < 32; i++) {
+    const major = i % 8 === 0;
+    const zone = i % 2 === 0;
+    const inner = major ? 32 : zone ? 34.5 : 36.5;
+    const rad = (i * 11.25 * Math.PI) / 180;
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', String(50 + Math.sin(rad) * inner));
+    line.setAttribute('y1', String(50 - Math.cos(rad) * inner));
+    line.setAttribute('x2', String(50 + Math.sin(rad) * 39));
+    line.setAttribute('y2', String(50 - Math.cos(rad) * 39));
+    if (major) line.setAttribute('class', 'is-major');
+    ticks.appendChild(line);
+  }
+  const bearingOf = (cx, cy, x, y) => (Math.atan2(x - cx, cy - y) * 180) / Math.PI;
+  let turn = null;
+  dial.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    try {
+      dial.setPointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    const r = dial.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    turn = { cx, cy, start: bearingOf(cx, cy, e.clientX, e.clientY), from: store.getState().rotation, x: e.clientX, y: e.clientY, moved: false };
+  });
+  dial.addEventListener('pointermove', (e) => {
+    if (!turn) return;
+    if (!turn.moved && Math.hypot(e.clientX - turn.x, e.clientY - turn.y) < 6) return;
+    turn.moved = true;
+    dial.classList.add('is-turning');
+    // The needle follows the finger; the number is the bearing, so it runs the other way
+    const delta = bearingOf(turn.cx, turn.cy, e.clientX, e.clientY) - turn.start;
+    store.setState(setRotation(Math.round((turn.from - delta) * 2) / 2));
+  });
+  const endTurn = () => {
+    if (!turn) return;
+    const { moved, from } = turn;
+    turn = null;
+    dial.classList.remove('is-turning');
+    if (moved) {
+      store.setState(commitRotationHistory(from));
+    } else if (!$('chartControls').hidden) {
+      rotationNumber.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => rotationNumber.focus(), 300);
+    } else {
+      showToast('Mark the boundary first, then turn North here');
+    }
+  };
+  dial.addEventListener('pointerup', endTurn);
+  dial.addEventListener('pointercancel', endTurn);
+
+  // Quick views: switch a whole set of charts at once
+  const viewButtons = [...document.querySelectorAll('[data-view]')];
+  viewButtons.forEach((btn) => btn.addEventListener('click', () => {
+    store.setState(applyView(btn.dataset.view));
+    canvasController.fitToView();
+  }));
+
+  // Save the 16 bar chart on its own
+  $('btnBarChartSave').addEventListener('click', () => {
+    $('barChartCanvas').toBlob((blob) => {
+      const day = new Date().toISOString().slice(0, 10);
+      deliverFile(blob, `VastuGyan-16-Bar-Chart-${day}.png`).then(announceExport);
+    }, 'image/png');
+  });
 
   // ---------- Chart switches ----------
   const layerInputs = [...document.querySelectorAll('[data-layer]')];
@@ -441,13 +661,15 @@ document.addEventListener('DOMContentLoaded', () => {
     $('btnFinish').hidden = !drawing;
     $('btnFinishLabel').textContent = `Finish (${corners})`;
     $('btnFinish').disabled = corners < 3;
-    $('btnUndo').hidden = !drawing;
-    $('btnRedo').hidden = !drawing;
     $('btnUndo').disabled = (state.history?.past?.length || 0) === 0;
     $('btnRedo').disabled = (state.history?.future?.length || 0) === 0;
     $('btnPng').disabled = drawing || !closed;
     $('btnPdf').disabled = drawing || !closed;
     $('btnClear').disabled = corners === 0;
+    $('btnNewPlan').disabled = drawing;
+    $('btnNewPhoto').disabled = drawing;
+    $('btnScaleTool').disabled = drawing;
+    $('btnScaleTool').classList.toggle('is-on', state.isCalibrating);
 
     $('drawHint').hidden = !drawing;
     $('scaleHint').hidden = !(state.isCalibrating && state.calibrationPoints.length < 2);
@@ -462,6 +684,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const deg = Math.round(state.rotation * 10) / 10;
     $('rotationBadge').textContent = `${deg}°`;
+    $('compassDeg').textContent = `${deg}°`;
+    $('compassRotor').style.transform = `rotate(${-state.rotation}deg)`;
+    const view = currentView(state.layers);
+    viewButtons.forEach((btn) => btn.setAttribute('aria-checked', String(btn.dataset.view === view)));
     if (document.activeElement !== rotationSlider) rotationSlider.value = state.rotation;
     if (document.activeElement !== rotationNumber) rotationNumber.value = deg;
 
@@ -473,7 +699,14 @@ document.addEventListener('DOMContentLoaded', () => {
     chakraButtons.forEach((btn) => btn.classList.toggle('is-on', Number(btn.dataset.chakraSize) === state.chakraSize));
 
     $('barChartCard').hidden = !(showBarChart && closed);
-    if (showBarChart && closed) draw16BarChart($('barChartCanvas'), calculate16BarChart(state.metrics.zones16, state.elementStyle));
+    if (showBarChart && closed) {
+      const chart = calculate16BarChart(state.metrics.zones16, state.elementStyle);
+      draw16BarChart($('barChartCanvas'), chart);
+      $('barStatTotal').textContent = chart.hasData ? formatArea(chart.totalArea, state.calibration) : '—';
+      $('barStatMean').textContent = chart.hasData ? `${chart.mean.toFixed(2)}% ± ${chart.sd.toFixed(2)}%` : '—';
+      $('barStatMax').textContent = chart.hasData ? `${chart.max.id} (${chart.max.pct.toFixed(1)}%)` : '—';
+      $('barStatMin').textContent = chart.hasData ? `${chart.min.id} (${chart.min.pct.toFixed(1)}%)` : '—';
+    }
 
     // Area Analysis
     const cal = state.calibration;
@@ -482,14 +715,67 @@ document.addEventListener('DOMContentLoaded', () => {
     const grid = state.metrics.grid9x9;
     $('valArea').textContent = area.hasClosedPlot ? formatArea(area.plotArea, cal) : '—';
     $('valBrahma').textContent = area.gridArea > 0 ? `${formatArea(area.brahmasthanArea, cal)} (${area.brahmasthanRatioPct}%)` : '—';
+    $('valPada').textContent = area.gridArea > 0 ? formatArea(area.padaArea, cal) : '—';
     $('valGrid').textContent = grid ? `${formatLength(grid.totalWidth, cal)} × ${formatLength(grid.totalHeight, cal)}` : '—';
     $('valLand').textContent = land.isActive
       ? ({ RECOMMENDED: 'Recommended', MODERATE: 'Conditional', CAUTION: 'Remedies needed' }[land.verdict.code] || '—')
       : (area.hasClosedPlot ? 'Needs scale' : '—');
     $('valScale').textContent = cal
-      ? `Scale set: ${cal.realLength} ${cal.unit} wall`
+      ? `Scale set: 1 ${cal.unit} = ${(1 / cal.realPerWorld).toFixed(2)} px on the plan (from a ${cal.realLength} ${cal.unit} wall)`
       : 'Scale not set, so sizes are in image pixels.';
     $('valScale').classList.toggle('is-set', !!cal);
+
+    // Land Energy
+    if (!$('landPanel').hidden) {
+      const yes = (ok, good, bad) => (ok ? good : bad);
+      $('valLandDims').textContent = land.isActive
+        ? `${land.length} × ${land.breadth} ft (${land.source === 'typed' ? 'typed in' : 'measured'})`
+        : (state.landDims ? `${state.landDims.length} × ${state.landDims.breadth} ft (typed in)` : 'Set the scale, or type the size');
+      $('valIncome').textContent = land.isActive ? `${land.income.toFixed(2)} (${land.length} × 8)` : '—';
+      $('valExpense').textContent = land.isActive ? `${land.expenditure.toFixed(2)} (${land.breadth} × 10.8)` : '—';
+      $('valCompare').textContent = land.isActive ? yes(land.incomeGreater, 'Income is higher', 'Expenditure is higher') : '—';
+      $('valPattern').textContent = land.isActive
+        ? `Remainder ${land.remainder}: ${yes(land.remainderInfo.isPositive, 'good', 'not good')}${land.borderline ? ' (borderline)' : ''}`
+        : '—';
+      $('valPatternCalc').hidden = !land.isActive;
+      if (land.isActive) {
+        $('valPatternCalc').textContent = `(${land.length} + ${land.breadth} = ${Math.round(land.exactSum * 100) / 100} → ${land.sumDimensions}) ÷ 8 leaves ${land.remainder}: ${land.remainderInfo.quality} (${land.remainderInfo.description}).`
+          + (land.borderline ? ` Borderline: the total is close to ${Math.floor(land.exactSum) + 0.5}, so a small measuring difference would give ${land.alternateRemainder}.` : '');
+      }
+      $('valRatio').textContent = land.isActive ? `${land.ratio.toFixed(2)}: ${yes(land.ratioGood, 'good', 'needs care')}` : '—';
+      const tone = land.isActive ? ({ RECOMMENDED: 'is-good', MODERATE: 'is-mid', CAUTION: 'is-bad' }[land.verdict.code] || '') : '';
+      $('valVerdict').className = `s-verdict ${tone}`;
+      $('valVerdictTitle').textContent = land.isActive
+        ? ({ RECOMMENDED: 'Recommended land', MODERATE: 'Conditionally suitable', CAUTION: 'Remedies needed' }[land.verdict.code] || '—')
+        : (area.hasClosedPlot ? 'Needs the scale or the plot size' : 'No boundary yet');
+      $('valVerdictText').textContent = land.isActive ? land.verdict.summary : 'Mark the boundary and set the scale to read the land energy.';
+    }
+
+    // Five Elements Balance
+    elementStyleButtons.forEach((btn) => btn.setAttribute('aria-checked', String(btn.dataset.elementStyle === state.elementStyle)));
+    $('elementStyleNote').textContent = ELEMENT_STYLES[state.elementStyle].note;
+    if (!$('elementsPanel').hidden) {
+      const tatva = calculatePanchTatvaSummary(state.metrics.zones16, state.elementStyle);
+      const colours = { water: '#2C6FB7', air: '#3E8E5E', fire: '#C2412B', earth: '#B8862B', space: '#7D7590' };
+      $('elementRows').innerHTML = tatva.map((el) => `<div class="s-area-row"><span><i class="s-dot" style="background:${colours[el.id] || '#999'}"></i>${el.name} <small>${el.zones.join(', ')}</small></span><strong>${el.hasData ? el.formattedPercentage : '—'}</strong></div>`).join('');
+      const earth = tatva.find((el) => el.id === 'earth');
+      $('earthSplit').hidden = !(earth && earth.earthSplit && earth.hasData);
+      if (earth && earth.earthSplit) $('earthSplit').textContent = `Earth: hard ${earth.earthSplit.hard}% (SSW, SW) · loose ${earth.earthSplit.loose}% (NE, NW)`;
+    }
+
+    // Vithi Mandal Shares
+    if (!$('vithiPanel').hidden) {
+      const vithi = calculateVithiSummary(state.metrics.vithi);
+      $('vithiRows').innerHTML = vithi.rings.map((ring) => {
+        const filled = vithi.hasData && ring.fillPct < 99.5 ? ` · plot fills ${Math.round(ring.fillPct)}% of the ring` : '';
+        const meta = vithi.hasData ? `${ring.padas} padas · ${formatArea(ring.area, cal)}${filled}` : `${ring.padas} padas`;
+        return `<div class="s-ring"><div class="s-ring-head"><span>${ring.name || ring.id} <small>${meta}</small></span><strong>${vithi.hasData ? `${ring.areaPct.toFixed(1)}%` : '—'}</strong></div><p>${VITHI_USE[ring.id] || ''}</p></div>`;
+      }).join('');
+    }
+
+    // Settings
+    $('toggleMandalaPlot').checked = state.mandalaShape !== 'rect';
+    $('toggleGridWalls').checked = state.gridAlign === 'walls';
 
     // The real length of the marked wall, once both ends are tapped
     if (state.isCalibrating && state.calibrationPoints.length === 2 && scaleModal.hidden) {

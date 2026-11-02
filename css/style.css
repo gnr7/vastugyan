@@ -293,11 +293,14 @@ button:disabled { cursor: default; opacity: 0.38; }
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
   padding: 24px 20px calc(var(--peek-h) + 24px);
+  overflow-y: auto; /* short screens: the card scrolls instead of being cut off */
+  overscroll-behavior: contain;
   z-index: 14;
   background: color-mix(in srgb, var(--canvas-bg) 70%, transparent);
 }
 .onboard-card {
   width: min(420px, 100%);
+  margin: auto; /* centred when it fits, top-aligned and scrollable when it doesn't */
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: var(--r-xl);
@@ -390,6 +393,7 @@ button:disabled { cursor: default; opacity: 0.38; }
   will-change: transform;
 }
 .panel[data-sheet="half"] { transform: translateY(30%); }
+.panel[data-sheet="half"] .panel-body { padding-bottom: calc(var(--sheet-hidden, 0px) + 28px + var(--safe-b)); }
 .panel[data-sheet="full"] { transform: translateY(0); }
 .panel[data-sheet="hidden"] { transform: translateY(100%); }
 .panel.is-dragging { transition: none; }

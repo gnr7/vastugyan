@@ -277,6 +277,13 @@ export const initUI = (store) => {
   new ResizeObserver(measurePeek).observe(handle);
   measurePeek();
 
+  // At half height part of the sheet sits below the dock; pad the list by that much so its end can scroll into view
+  const measureHidden = () => {
+    panel.style.setProperty('--sheet-hidden', `${Math.ceil(panel.offsetHeight * 0.3)}px`);
+  };
+  new ResizeObserver(measureHidden).observe(panel);
+  measureHidden();
+
   setPanel(currentPanel);
   const api = { openPanel, setPanel, setSheet, showToast, sync, isWide, onSheetSettled: null };
   return api;
