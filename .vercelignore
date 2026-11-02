@@ -1,6 +1,8 @@
 # Publish only the app itself: never scratch/, docs/, demo plans, notes or tooling
 /*
 !index.html
+!simple.html
+!vercel.json
 !manifest.webmanifest
 !sw.js
 !css

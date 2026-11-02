@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Vastu Gyan — Simple view</title>
+  <meta name="description" content="Vastu Gyan in a simple one-page layout: upload a floor plan, mark the boundary, and switch the Vastu charts on and off.">
+  <meta name="theme-color" content="#F4F6F9">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Marcellus&display=swap" rel="stylesheet">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/simple.css">
+</head>
+<body>
+  <!-- Icon sprite -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="s-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></symbol>
+      <symbol id="s-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/></symbol>
+      <symbol id="s-rotate" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+      <symbol id="s-crop" viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></symbol>
+      <symbol id="s-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+      <symbol id="s-pen" viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></symbol>
+      <symbol id="s-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+      <symbol id="s-redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></symbol>
+      <symbol id="s-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
+      <symbol id="s-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/></symbol>
+      <symbol id="s-close" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+      <symbol id="s-ruler" viewBox="0 0 24 24"><path d="M3 17 17 3l4 4L7 21z"/><path d="m7 13 2 2M10 10l2 2M13 7l2 2"/></symbol>
+    </defs>
+  </svg>
+
+  <header class="s-header">
+    <div class="s-brand">
+      <svg class="s-brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="2" y="2" width="28" height="28" rx="7" class="s-brand-bg"/>
+        <path d="M8 8h16v16H8z M13.33 8v16 M18.67 8v16 M8 13.33h16 M8 18.67h16" class="s-brand-grid"/>
+        <rect x="13.33" y="13.33" width="5.34" height="5.34" class="s-brand-core"/>
+      </svg>
+      <div>
+        <div class="s-brand-name">Vastu Gyan</div>
+        <div class="s-brand-sub">Simple view</div>
+      </div>
+    </div>
+    <a class="s-header-link" href="./">Full app</a>
+  </header>
+
+  <main class="s-main">
+    <!-- 1. Choose a floor plan -->
+    <section id="stepUpload">
+      <div class="s-card">
+        <h1 class="s-card-title"><svg class="s-icon"><use href="#s-upload"/></svg>Add your floor plan</h1>
+        <button type="button" class="s-drop" id="dropZone">
+          <span class="s-drop-icon"><svg class="s-icon"><use href="#s-image"/></svg></span>
+          <span class="s-drop-title">Choose a floor plan image</span>
+          <span class="s-drop-sub">Tap here to pick a photo or file, or drop an image on this box</span>
+          <span class="s-drop-note">PNG, JPG or WebP</span>
+        </button>
+        <button type="button" class="s-text-btn" id="btnBlank">No image? Start on a blank page</button>
+      </div>
+      <ol class="s-card s-steps">
+        <li><span class="s-step-n s-n1">1</span><span><strong>Add the plan</strong>A photo or image of the floor plan</span></li>
+        <li><span class="s-step-n s-n2">2</span><span><strong>Mark the boundary</strong>Tap each outer corner, then press Finish</span></li>
+        <li><span class="s-step-n s-n3">3</span><span><strong>Read the charts</strong>Turn each Vastu chart on or off with its switch</span></li>
+      </ol>
+    </section>
+
+    <!-- 2. Turn or trim the image first -->
+    <section id="stepPreview" hidden>
+      <div class="s-card">
+        <h2 class="s-preview-title" id="previewTitle">Check the plan before you start</h2>
+        <div class="s-preview-box"><canvas id="previewCanvas" aria-label="Floor plan preview"></canvas></div>
+        <div class="s-row s-center" id="previewTools">
+          <button type="button" class="s-btn s-btn-light" id="btnRotate90"><svg class="s-icon"><use href="#s-rotate"/></svg>Rotate 90°</button>
+          <span class="s-deg" id="previewDeg">0°</span>
+          <button type="button" class="s-btn s-btn-light" id="btnCrop"><svg class="s-icon"><use href="#s-crop"/></svg>Crop</button>
+        </div>
+        <div class="s-row s-center" id="cropTools" hidden>
+          <button type="button" class="s-btn s-btn-light" id="btnCropCancel">Cancel crop</button>
+          <button type="button" class="s-btn s-btn-blue" id="btnCropApply"><svg class="s-icon"><use href="#s-check"/></svg>Apply crop</button>
+        </div>
+        <div class="s-row s-split" id="previewActions">
+          <button type="button" class="s-btn s-btn-light" id="btnPreviewCancel">Cancel</button>
+          <button type="button" class="s-btn s-btn-blue" id="btnPreviewUse"><svg class="s-icon"><use href="#s-check"/></svg>Use this plan</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Mark the boundary and read the charts -->
+    <section id="stepWork" hidden>
+      <div class="s-card s-filebar">
+        <img id="planThumb" alt="" hidden>
+        <span class="s-filename" id="planName">Blank page</span>
+        <button type="button" class="s-round-btn" id="btnStartOver" title="Remove this plan and start again" aria-label="Remove this plan and start again"><svg class="s-icon"><use href="#s-close"/></svg></button>
+      </div>
+
+      <div class="s-layout">
+        <div class="s-left">
+          <div class="s-toolbar">
+            <button type="button" class="s-btn s-btn-blue" id="btnDraw"><svg class="s-icon"><use href="#s-pen"/></svg><span id="btnDrawLabel">Draw Polygon</span></button>
+            <button type="button" class="s-btn s-btn-green" id="btnFinish" hidden><svg class="s-icon"><use href="#s-check"/></svg><span id="btnFinishLabel">Finish</span></button>
+            <button type="button" class="s-btn s-btn-orange" id="btnUndo" hidden><svg class="s-icon"><use href="#s-undo"/></svg>Undo</button>
+            <button type="button" class="s-btn s-btn-orange" id="btnRedo" hidden><svg class="s-icon"><use href="#s-redo"/></svg>Redo</button>
+            <button type="button" class="s-btn s-btn-green" id="btnPng"><svg class="s-icon"><use href="#s-download"/></svg>PNG</button>
+            <button type="button" class="s-btn s-btn-blue" id="btnPdf"><svg class="s-icon"><use href="#s-file"/></svg>PDF Report</button>
+            <button type="button" class="s-btn s-btn-light" id="btnClear">Clear</button>
+          </div>
+
+          <div class="s-zoom">
+            <span class="s-zoom-label">Image size</span>
+            <button type="button" class="s-sq-btn" id="btnZoomOut" aria-label="Smaller">−</button>
+            <span class="s-zoom-pct" id="zoomPct">100%</span>
+            <button type="button" class="s-sq-btn" id="btnZoomIn" aria-label="Bigger">+</button>
+            <button type="button" class="s-small-btn" id="btnZoomReset">Reset</button>
+          </div>
+
+          <div class="s-card s-stage" id="stage">
+            <canvas id="planCanvas" aria-label="Floor plan"></canvas>
+          </div>
+
+          <div class="s-hint" id="drawHint" hidden>
+            <strong>Marking the boundary.</strong>
+            <span class="only-touch">Press and lift on each outer corner, in order around the plot. </span>
+            <span class="only-mouse">Click each outer corner, in order around the plot. </span>
+            When every corner is placed, press <strong>Finish</strong>.
+          </div>
+          <div class="s-hint" id="scaleHint" hidden>
+            <strong>Setting the scale.</strong> Tap both ends of one wall whose real length you know.
+            <button type="button" class="s-small-btn" id="btnScaleCancel">Cancel</button>
+          </div>
+          <div class="s-hint s-hint-alert" id="crossHint" hidden>
+            The boundary crosses itself. Drag a corner so the edges no longer cross, or press Undo.
+          </div>
+
+          <div class="s-card s-chart-card" id="barChartCard" hidden>
+            <h2 class="s-chart-title">16 Bar Chart</h2>
+            <p class="s-chart-sub">Share of the plot's area in each of the 16 directions</p>
+            <canvas id="barChartCanvas" class="s-bar-canvas" aria-label="16 direction bar chart"></canvas>
+          </div>
+        </div>
+
+        <aside class="s-card s-right">
+          <label class="s-check">
+            <input type="checkbox" id="toggleAreaAnalysis">
+            <span>Area Analysis</span>
+          </label>
+          <div class="s-area" id="areaPanel" hidden>
+            <div class="s-area-row"><span>Plot area</span><strong id="valArea">—</strong></div>
+            <div class="s-area-row"><span>Brahmasthan</span><strong id="valBrahma">—</strong></div>
+            <div class="s-area-row"><span>Grid size</span><strong id="valGrid">—</strong></div>
+            <div class="s-area-row"><span>Land energy</span><strong id="valLand">—</strong></div>
+            <p class="s-area-note" id="valScale">Scale not set, so sizes are in image pixels.</p>
+            <button type="button" class="s-btn s-btn-light s-btn-block" id="btnSetScale"><svg class="s-icon"><use href="#s-ruler"/></svg>Set scale</button>
+          </div>
+
+          <p class="s-empty" id="drawFirst">Mark the boundary of the plot to see the charts here.</p>
+
+          <div id="chartControls" hidden>
+            <div class="s-rotation">
+              <div class="s-rotation-head">
+                <span>Universal Rotation</span>
+                <span class="s-badge" id="rotationBadge">0°</span>
+              </div>
+              <input type="range" id="rotationSlider" min="0" max="360" step="0.5" value="0" aria-label="Universal rotation">
+              <div class="s-rotation-row">
+                <button type="button" class="s-sq-btn" id="btnRotMinus" aria-label="Turn 1 degree back">−</button>
+                <input type="number" id="rotationNumber" class="s-number" min="0" max="360" step="0.5" value="0" inputmode="decimal" aria-label="Rotation in degrees">
+                <button type="button" class="s-sq-btn" id="btnRotPlus" aria-label="Turn 1 degree forward">+</button>
+                <button type="button" class="s-small-btn" id="btnRotReset">Reset</button>
+              </div>
+            </div>
+
+            <div class="s-switches">
+              <label class="s-switch-row"><span>16 Directions</span><input type="checkbox" data-layer="zones16"><span class="s-switch" aria-hidden="true"></span></label>
+              <label class="s-switch-row"><span>32 Gates</span><input type="checkbox" data-layer="gates32"><span class="s-switch" aria-hidden="true"></span></label>
+              <label class="s-switch-row"><span>32 Gates 81 Pad</span><input type="checkbox" data-layer="gatePadas"><span class="s-switch" aria-hidden="true"></span></label>
+              <label class="s-switch-row"><span>Shakti Chakra</span><input type="checkbox" data-layer="shaktiChakra"><span class="s-switch" aria-hidden="true"></span></label>
+              <div class="s-sizes" id="chakraSizes" hidden>
+                <span>Size</span>
+                <button type="button" data-chakra-size="0.6">60%</button>
+                <button type="button" data-chakra-size="0.8">80%</button>
+                <button type="button" data-chakra-size="1">Fit</button>
+                <button type="button" data-chakra-size="1.25">125%</button>
+                <button type="button" data-chakra-size="1.5">150%</button>
+              </div>
+              <label class="s-switch-row"><span>45 Devtas</span><input type="checkbox" data-layer="devtas45"><span class="s-switch" aria-hidden="true"></span></label>
+              <label class="s-switch-row"><span>45 Devtas Names</span><input type="checkbox" data-layer="devtaNames"><span class="s-switch" aria-hidden="true"></span></label>
+              <label class="s-switch-row"><span>16 Bar Chart</span><input type="checkbox" id="toggleBarChart"><span class="s-switch" aria-hidden="true"></span></label>
+              <label class="s-switch-row"><span>Marma Sthan</span><input type="checkbox" data-layer="marma"><span class="s-switch" aria-hidden="true"></span></label>
+              <label class="s-switch-row"><span>Vithi Mandal</span><input type="checkbox" data-layer="vithi"><span class="s-switch" aria-hidden="true"></span></label>
+              <label class="s-switch-row"><span>Five Elements</span><input type="checkbox" data-layer="elements"><span class="s-switch" aria-hidden="true"></span></label>
+              <label class="s-switch-row"><span>9×9 Grid</span><input type="checkbox" data-layer="grid9x9"><span class="s-switch" aria-hidden="true"></span></label>
+              <label class="s-switch-row"><span>Brahmasthan</span><input type="checkbox" data-layer="brahmasthan"><span class="s-switch" aria-hidden="true"></span></label>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <!-- PDF details -->
+  <div class="s-modal" id="pdfModal" hidden>
+    <div class="s-modal-box" role="dialog" aria-modal="true" aria-labelledby="pdfModalTitle">
+      <h2 class="s-modal-title" id="pdfModalTitle">PDF Report</h2>
+      <p class="s-modal-sub">Add the client's details to print on the report, or leave them empty.</p>
+      <label class="s-field">Name<input type="text" id="pdfName" autocomplete="off"></label>
+      <label class="s-field">Phone<input type="tel" id="pdfPhone" autocomplete="off"></label>
+      <label class="s-field">Address<input type="text" id="pdfAddress" autocomplete="off"></label>
+      <div class="s-row s-split">
+        <button type="button" class="s-btn s-btn-light" id="btnPdfCancel">Cancel</button>
+        <button type="button" class="s-btn s-btn-blue" id="btnPdfMake"><svg class="s-icon"><use href="#s-file"/></svg>Make PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scale: real length of the marked wall -->
+  <div class="s-modal" id="scaleModal" hidden>
+    <div class="s-modal-box" role="dialog" aria-modal="true" aria-labelledby="scaleModalTitle">
+      <h2 class="s-modal-title" id="scaleModalTitle">Real length of this wall</h2>
+      <p class="s-modal-sub" id="scaleModalSub">Type the real length of the line you marked.</p>
+      <div class="s-row">
+        <input type="number" id="scaleLength" class="s-number s-grow" min="0" step="0.01" inputmode="decimal" aria-label="Real length">
+        <select id="scaleUnit" class="s-select" aria-label="Unit">
+          <option value="ft">feet</option>
+          <option value="m">metres</option>
+        </select>
+      </div>
+      <div class="s-row s-split">
+        <button type="button" class="s-btn s-btn-light" id="btnScaleModalCancel">Cancel</button>
+        <button type="button" class="s-btn s-btn-blue" id="btnScaleModalApply"><svg class="s-icon"><use href="#s-check"/></svg>Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="s-toast-stack" id="toastStack" aria-live="polite"></div>
+  <input type="file" id="fileInput" accept="image/png, image/jpeg, image/webp" hidden>
+
+  <script src="js/vendor/jspdf.umd.min.js"></script>
+  <script type="module" src="js/simple.js"></script>
+</body>
+</html>

@@ -17,7 +17,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 5180
 
 # Everything the app needs, and nothing else
-ALLOWED_FILES = {"index.html", "manifest.webmanifest", "sw.js"}
+ALLOWED_FILES = {"index.html", "simple.html", "manifest.webmanifest", "sw.js"}
 ALLOWED_DIRS = ("css/", "js/", "icons/")
 
 
