@@ -179,6 +179,16 @@ button:disabled { cursor: default; opacity: 0.38; }
 .icon-btn:not(:disabled):hover { background: var(--paper-2); }
 .icon-btn:not(:disabled):active { transform: scale(0.92); background: var(--saffron-wash); }
 .icon-btn-boxed { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--paper); }
+/* Way to the simple one-page view */
+.topbar-simple {
+  min-height: 40px; margin-left: 6px;
+  display: inline-flex; align-items: center;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--saffron); color: #fffaf2;
+  font-size: 14px; font-weight: 700; text-decoration: none;
+}
+.topbar-simple:hover { background: var(--saffron-deep); }
 
 .workspace { position: relative; min-height: 0; overflow: hidden; }
 
