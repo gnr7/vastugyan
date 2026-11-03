@@ -643,9 +643,10 @@ export const draw16Zones = (ctx, zones16, scale, layers, plot = null, style = 'c
     ctx.lineWidth = 2.6 / scale;
     ctx.setLineDash(layers.zones16 ? [10 / scale, 5 / scale] : []);
   } else {
-    ctx.strokeStyle = layers.zones16 ? 'rgba(42, 31, 23, 0.55)' : 'rgba(42, 31, 23, 0.7)';
-    ctx.lineWidth = (layers.zones16 ? 1 : 1.4) / scale;
-    ctx.setLineDash(layers.zones16 ? [4 / scale, 3 / scale] : []);
+    ctx.strokeStyle = THEME.ink;
+    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = (layers.zones16 ? 1.7 : 1.4) / scale;
+    ctx.setLineDash(layers.zones16 ? [7 / scale, 4 / scale] : []);
   }
   ctx.stroke();
   ctx.setLineDash([]);
@@ -845,6 +846,31 @@ export const drawShaktiChakra = (ctx, zones16, scale, plot, style = 'classic', r
     board.add({ text: `N ${deg}°`, x: label.x, y: label.y, px: 11.5, weight: 700, pill: { fill: THEME.kumkum, text: '#FFFFFF' }, priority: LABEL_PRIORITY.north, force: true });
   }
 
+  ctx.restore();
+};
+
+// 32 gate lines from the centroid to the walls, one on every gate boundary (N1 starts at 315°)
+export const drawGateRays = (ctx, zones16, plot, scale, print = false) => {
+  if (!zones16 || !zones16.centroid || !plot || plot.length < 3) return;
+  const north = zones16.zones.find((z) => z.id === 'N');
+  if (!north) return;
+  const c = zones16.centroid;
+  ctx.save();
+  ctx.beginPath();
+  GATE_RING.forEach((gate) => {
+    const rad = north.centerRad + ((gate.bearing - GATE_SPAN_DEG / 2) * Math.PI) / 180;
+    const dir = { x: Math.cos(rad), y: Math.sin(rad) };
+    const hit = rayPolygonHit(plot, c, dir);
+    if (!hit) return;
+    ctx.moveTo(c.x, c.y);
+    ctx.lineTo(c.x + dir.x * hit.dist, c.y + dir.y * hit.dist);
+  });
+  // Solid, so they read apart from the dotted 16 zone lines
+  ctx.strokeStyle = print ? 'rgba(25, 30, 38, 0.85)' : THEME.ink;
+  ctx.globalAlpha = print ? 1 : 0.6;
+  ctx.lineWidth = (print ? 1.8 : 1.1) / scale;
+  ctx.setLineDash([]);
+  ctx.stroke();
   ctx.restore();
 };
 
@@ -1798,6 +1824,7 @@ export class CanvasController {
 
     // 8. 32 entrances along the walls
     if (state.metrics.entranceGates32) {
+      if (L.gates32 && plot) drawGateRays(ctx, state.metrics.zones16, plot, scale, print);
       draw32EntranceGates(ctx, state.metrics.entranceGates32, scale, L, state.rotation, board);
     }
 

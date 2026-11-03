@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let currentImageBlob = null; // the plan as used (after any turn or crop), kept for autosave
   let restoring = false;       // no step-by-step messages while a saved project loads
-  let drawnHere = false;       // a boundary marked on this page opens with only 16 Directions on
+  let drawnHere = false;       // a boundary marked on this page opens with only 16 Zones on
   let showBarChart = false;
 
   const showToast = (message) => {
@@ -800,7 +800,7 @@ document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => $('scaleLength').focus(), 50);
     }
 
-    // A boundary just finished on this page: start with 16 Directions only, as a plain reading
+    // A boundary just finished on this page: start with 16 Zones only, as a plain reading
     if (!restoring && closed && !lastState.isPolygonClosed && drawnHere) {
       drawnHere = false;
       queueMicrotask(() => {
