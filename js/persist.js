@@ -50,6 +50,7 @@ export const clearProject = async () => {
 const snapshotOf = (state) => ({
   polygon: state.polygon,
   isPolygonClosed: state.isPolygonClosed,
+  isPolygonLocked: state.isPolygonLocked,
   rotation: state.rotation,
   gridAlign: state.gridAlign,
   mandalaShape: state.mandalaShape,
@@ -85,6 +86,7 @@ export const startAutosave = (store, getImageBlob) => {
         savedAt: Date.now(),
         polygon: state.polygon.map((p) => ({ x: p.x, y: p.y })),
         isPolygonClosed: state.isPolygonClosed,
+        isPolygonLocked: state.isPolygonLocked,
         rotation: state.rotation,
         gridAlign: state.gridAlign,
         mandalaShape: state.mandalaShape,

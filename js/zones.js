@@ -11,22 +11,22 @@ import {
 
 // Classical 16 Directional Zones Definition
 export const ZONES_16_DATA = [
-  { id: 'N', name: 'North', short: 'N', centerDeg: 0, element: 'Water', color: '#1a73e8', bgTint: 'rgba(26, 115, 232, 0.08)', attribute: 'Wealth & Opportunities' },
-  { id: 'NNE', name: 'North-North-East', short: 'NNE', centerDeg: 22.5, element: 'Water', color: '#1a73e8', bgTint: 'rgba(26, 115, 232, 0.08)', attribute: 'Health & Immunity' },
-  { id: 'NE', name: 'North-East', short: 'NE', centerDeg: 45, element: 'Water', color: '#1a73e8', bgTint: 'rgba(26, 115, 232, 0.08)', attribute: 'Wisdom & Clarity' },
-  { id: 'ENE', name: 'East-North-East', short: 'ENE', centerDeg: 67.5, element: 'Air', color: '#1e8e3e', bgTint: 'rgba(30, 142, 62, 0.08)', attribute: 'Fun & Refreshment' },
-  { id: 'E', name: 'East', short: 'E', centerDeg: 90, element: 'Air', color: '#1e8e3e', bgTint: 'rgba(30, 142, 62, 0.08)', attribute: 'Social Connections' },
-  { id: 'ESE', name: 'East-South-East', short: 'ESE', centerDeg: 112.5, element: 'Air', color: '#1e8e3e', bgTint: 'rgba(30, 142, 62, 0.08)', attribute: 'Churning & Anxiety' },
-  { id: 'SE', name: 'South-East', short: 'SE', centerDeg: 135, element: 'Fire', color: '#d93025', bgTint: 'rgba(217, 48, 37, 0.08)', attribute: 'Cash Liquidity & Fire' },
-  { id: 'SSE', name: 'South-South-East', short: 'SSE', centerDeg: 157.5, element: 'Fire', color: '#d93025', bgTint: 'rgba(217, 48, 37, 0.08)', attribute: 'Power & Confidence' },
-  { id: 'S', name: 'South', short: 'S', centerDeg: 180, element: 'Fire', color: '#d93025', bgTint: 'rgba(217, 48, 37, 0.08)', attribute: 'Fame & Relaxation' },
-  { id: 'SSW', name: 'South-South-West', short: 'SSW', centerDeg: 202.5, element: 'Earth', color: '#e37400', bgTint: 'rgba(227, 116, 0, 0.08)', attribute: 'Expenditure & Disposal' },
-  { id: 'SW', name: 'South-West', short: 'SW', centerDeg: 225, element: 'Earth', color: '#e37400', bgTint: 'rgba(227, 116, 0, 0.08)', attribute: 'Relationships & Skills' },
-  { id: 'WSW', name: 'West-South-West', short: 'WSW', centerDeg: 247.5, element: 'Space', color: '#5f6368', bgTint: 'rgba(95, 99, 104, 0.08)', attribute: 'Knowledge & Savings' },
-  { id: 'W', name: 'West', short: 'W', centerDeg: 270, element: 'Space', color: '#5f6368', bgTint: 'rgba(95, 99, 104, 0.08)', attribute: 'Gains & Profits' },
-  { id: 'WNW', name: 'West-North-West', short: 'WNW', centerDeg: 292.5, element: 'Space', color: '#5f6368', bgTint: 'rgba(95, 99, 104, 0.08)', attribute: 'Depression & Detox' },
-  { id: 'NW', name: 'North-West', short: 'NW', centerDeg: 315, element: 'Space', color: '#5f6368', bgTint: 'rgba(95, 99, 104, 0.08)', attribute: 'Support & Banking' },
-  { id: 'NNW', name: 'North-North-West', short: 'NNW', centerDeg: 337.5, element: 'Water', color: '#1a73e8', bgTint: 'rgba(26, 115, 232, 0.08)', attribute: 'Sex & Attraction' }
+  { id: 'N', name: 'North', short: 'N', centerDeg: 0, element: 'Water', color: '#1F1F1F', bgTint: 'rgba(31, 31, 31, 0.08)', attribute: 'Wealth & Opportunities' },
+  { id: 'NNE', name: 'North-North-East', short: 'NNE', centerDeg: 22.5, element: 'Water', color: '#1F1F1F', bgTint: 'rgba(31, 31, 31, 0.08)', attribute: 'Health & Immunity' },
+  { id: 'NE', name: 'North-East', short: 'NE', centerDeg: 45, element: 'Water', color: '#1F1F1F', bgTint: 'rgba(31, 31, 31, 0.08)', attribute: 'Wisdom & Clarity' },
+  { id: 'ENE', name: 'East-North-East', short: 'ENE', centerDeg: 67.5, element: 'Air', color: '#8B5A2B', bgTint: 'rgba(139, 90, 43, 0.09)', attribute: 'Fun & Refreshment' },
+  { id: 'E', name: 'East', short: 'E', centerDeg: 90, element: 'Air', color: '#8B5A2B', bgTint: 'rgba(139, 90, 43, 0.09)', attribute: 'Social Connections' },
+  { id: 'ESE', name: 'East-South-East', short: 'ESE', centerDeg: 112.5, element: 'Air', color: '#8B5A2B', bgTint: 'rgba(139, 90, 43, 0.09)', attribute: 'Churning & Anxiety' },
+  { id: 'SE', name: 'South-East', short: 'SE', centerDeg: 135, element: 'Fire', color: '#E8590C', bgTint: 'rgba(242, 107, 29, 0.09)', attribute: 'Cash Liquidity & Fire' },
+  { id: 'SSE', name: 'South-South-East', short: 'SSE', centerDeg: 157.5, element: 'Fire', color: '#E8590C', bgTint: 'rgba(242, 107, 29, 0.09)', attribute: 'Power & Confidence' },
+  { id: 'S', name: 'South', short: 'S', centerDeg: 180, element: 'Fire', color: '#E8590C', bgTint: 'rgba(242, 107, 29, 0.09)', attribute: 'Fame & Relaxation' },
+  { id: 'SSW', name: 'South-South-West', short: 'SSW', centerDeg: 202.5, element: 'Earth', color: '#A87A1E', bgTint: 'rgba(184, 134, 43, 0.10)', attribute: 'Expenditure & Disposal' },
+  { id: 'SW', name: 'South-West', short: 'SW', centerDeg: 225, element: 'Earth', color: '#A87A1E', bgTint: 'rgba(184, 134, 43, 0.10)', attribute: 'Relationships & Skills' },
+  { id: 'WSW', name: 'West-South-West', short: 'WSW', centerDeg: 247.5, element: 'Space', color: '#4A4A4A', bgTint: 'rgba(255, 255, 255, 0.35)', attribute: 'Knowledge & Savings' },
+  { id: 'W', name: 'West', short: 'W', centerDeg: 270, element: 'Space', color: '#4A4A4A', bgTint: 'rgba(255, 255, 255, 0.35)', attribute: 'Gains & Profits' },
+  { id: 'WNW', name: 'West-North-West', short: 'WNW', centerDeg: 292.5, element: 'Space', color: '#4A4A4A', bgTint: 'rgba(255, 255, 255, 0.35)', attribute: 'Depression & Detox' },
+  { id: 'NW', name: 'North-West', short: 'NW', centerDeg: 315, element: 'Space', color: '#4A4A4A', bgTint: 'rgba(255, 255, 255, 0.35)', attribute: 'Support & Banking' },
+  { id: 'NNW', name: 'North-North-West', short: 'NNW', centerDeg: 337.5, element: 'Water', color: '#1F1F1F', bgTint: 'rgba(31, 31, 31, 0.08)', attribute: 'Sex & Attraction' }
 ];
 
 // The two Five Elements conventions practitioners use. 'classic' follows VastuGrid (NE is Water,

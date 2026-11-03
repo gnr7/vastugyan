@@ -50,7 +50,8 @@ export const LABEL_PRIORITY = {
   centroid: 10
 };
 
-const createLabelBoard = () => {
+// textScale enlarges every label (used for the PNG and PDF, which are read on paper)
+const createLabelBoard = (textScale = 1) => {
   const items = [];
   return {
     // item: { text, x, y, px, weight, color, priority, sub, subPx, pill: { fill, text }, angle, alts, force, font }
@@ -59,8 +60,8 @@ const createLabelBoard = () => {
       const boxes = [];
       const free = (b) => !boxes.some((o) => b.x0 < o.x1 && b.x1 > o.x0 && b.y0 < o.y1 && b.y1 > o.y0);
       items.sort((a, b) => b.priority - a.priority).forEach((it) => {
-        const size = it.px / scale;
-        const subSize = it.sub ? (it.subPx || it.px * 0.78) / scale : 0;
+        const size = (it.px * textScale) / scale;
+        const subSize = it.sub ? ((it.subPx || it.px * 0.78) * textScale) / scale : 0;
         ctx.font = `${it.weight || 600} ${size}px ${it.font || "'Hanken Grotesk', sans-serif"}`;
         let w = ctx.measureText(it.text).width;
         if (it.sub) {
@@ -240,6 +241,7 @@ export const drawFloorPlanImage = (ctx, image) => {
 // Render polygon boundary, vertex handles, and numbers
 export const drawPolygon = (ctx, state) => {
   const { polygon, isPolygonClosed, isDrawingPolygon, cursorWorldPos, hoverVertexIndex, draggingVertexIndex, viewport } = state;
+  // A finished boundary shows no corner handles until Edit Polygon
   const n = polygon.length;
   if (n === 0 && !cursorWorldPos) return;
 
@@ -303,8 +305,8 @@ export const drawPolygon = (ctx, state) => {
     ctx.stroke();
   }
 
-  // 2. Draw vertex handles and numbered labels
-  polygon.forEach((vertex, idx) => {
+  // 2. Draw vertex handles and numbered labels (hidden while the boundary is locked)
+  if (!(isPolygonClosed && state.isPolygonLocked)) polygon.forEach((vertex, idx) => {
     const isHovered = hoverVertexIndex === idx;
     const isDragging = draggingVertexIndex === idx;
     const isFirstInDraft = !isPolygonClosed && idx === 0 && n >= 3;
@@ -575,18 +577,18 @@ export const draw45Devtas = (ctx, devtaFields, scale, layers, angleDeg = 0, boar
 
 // Render 16 Directional Zones (22.5° rays, sector fills, directional badges)
 const ELEMENT_STYLE = {
-  Water: { color: '#2C6FB7', fill: 'rgba(44, 111, 183, 0.22)', label: 'Water' },
-  Air: { color: '#3E8E5E', fill: 'rgba(62, 142, 94, 0.22)', label: 'Air' },
-  Fire: { color: '#C2412B', fill: 'rgba(194, 65, 43, 0.20)', label: 'Fire' },
+  Water: { color: '#1F1F1F', fill: 'rgba(31, 31, 31, 0.20)', label: 'Water' },
+  Air: { color: '#8B5A2B', fill: 'rgba(139, 90, 43, 0.24)', label: 'Air' },
+  Fire: { color: '#E8590C', fill: 'rgba(242, 107, 29, 0.26)', label: 'Fire' },
   Earth: { color: '#B8862B', fill: 'rgba(184, 134, 43, 0.24)', label: 'Earth' },
-  Space: { color: '#7D7590', fill: 'rgba(125, 117, 144, 0.22)', label: 'Space' },
+  Space: { color: '#4A4A4A', fill: 'rgba(255, 255, 255, 0.62)', label: 'Space' }, // white area, dark label
   HardEarth: { color: '#A87A12', fill: 'rgba(222, 178, 40, 0.30)', label: 'Hard earth' },
   LooseEarth: { color: '#97804A', fill: 'rgba(238, 220, 160, 0.42)', label: 'Loose earth' }
 };
 
 // Render the 16 directional zones and/or the Five Elements view.
 // With a closed plot both are clipped to it: rays end on the walls and labels sit inside.
-export const draw16Zones = (ctx, zones16, scale, layers, plot = null, style = 'classic', board = null, withFill = true) => {
+export const draw16Zones = (ctx, zones16, scale, layers, plot = null, style = 'classic', board = null, withFill = true, print = false) => {
   if (!zones16 || !zones16.zones || zones16.zones.length === 0) return;
   if (!layers.zones16 && !layers.elements) return;
   const { centroid, radius, zones } = zones16;
@@ -635,9 +637,16 @@ export const draw16Zones = (ctx, zones16, scale, layers, plot = null, style = 'c
     ctx.moveTo(centroid.x, centroid.y);
     ctx.lineTo(centroid.x + Math.cos(z.startRad) * reach, centroid.y + Math.sin(z.startRad) * reach);
   });
-  ctx.strokeStyle = layers.zones16 ? 'rgba(42, 31, 23, 0.55)' : 'rgba(42, 31, 23, 0.7)';
-  ctx.lineWidth = (layers.zones16 ? 1 : 1.4) / scale;
-  ctx.setLineDash(layers.zones16 ? [4 / scale, 3 / scale] : []);
+  // On screen a light dotted line; on paper (PNG / PDF) a bold, near-black dashed line so it survives printing
+  if (print) {
+    ctx.strokeStyle = 'rgba(20, 15, 10, 0.92)';
+    ctx.lineWidth = 2.6 / scale;
+    ctx.setLineDash(layers.zones16 ? [10 / scale, 5 / scale] : []);
+  } else {
+    ctx.strokeStyle = layers.zones16 ? 'rgba(42, 31, 23, 0.55)' : 'rgba(42, 31, 23, 0.7)';
+    ctx.lineWidth = (layers.zones16 ? 1 : 1.4) / scale;
+    ctx.setLineDash(layers.zones16 ? [4 / scale, 3 / scale] : []);
+  }
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.restore();
@@ -698,13 +707,13 @@ export const shaktiChakraRadii = (plot, centroid, size = 1) => {
 };
 
 const WHEEL_STYLE = {
-  Water: { fill: '#2F6DB0', text: '#FFFFFF' },
-  Air: { fill: '#3E8E5E', text: '#FFFFFF' },
-  Fire: { fill: '#A8322A', text: '#FFFFFF' },
+  Water: { fill: '#1F1F1F', text: '#FFFFFF' },
+  Air: { fill: '#8B5A2B', text: '#FFFFFF' },
+  Fire: { fill: '#F26B1D', text: '#FFFFFF' },
   Earth: { fill: '#D7A531', text: '#3A2A10' },
   HardEarth: { fill: '#E6C02E', text: '#3A2A10' },
   LooseEarth: { fill: '#F4EAC0', text: '#5A4520' },
-  Space: { fill: '#A7A1B3', text: '#FFFFFF' }
+  Space: { fill: '#FFFFFF', text: '#2A1F17', seam: '#9A9A9A' } // white needs a visible edge
 };
 
 // One or two lines of text on the dial, turned so they never read upside down
@@ -812,7 +821,7 @@ export const drawShaktiChakra = (ctx, zones16, scale, plot, style = 'classic', r
     ctx.closePath();
     ctx.fillStyle = look.fill;
     ctx.fill();
-    ctx.strokeStyle = '#FFFFFF';
+    ctx.strokeStyle = look.seam || '#FFFFFF';
     ctx.lineWidth = 1.5 / scale;
     ctx.stroke();
     drawChakraText(ctx, centroid, z.centerRad, (edge.zones + edge.gates) / 2, [z.short], { px: outer * 0.04, weight: 700, color: look.text });
@@ -1183,7 +1192,8 @@ export class CanvasController {
       return;
     }
 
-    const hitIndex = state.polygon.length > 0
+    const locked = state.isPolygonClosed && state.isPolygonLocked;
+    const hitIndex = state.polygon.length > 0 && !locked
       ? findClosestVertex(worldPos, state.polygon, TOUCH_HIT_RADIUS / scale)
       : -1;
     if (hitIndex !== -1) {
@@ -1450,8 +1460,8 @@ export class CanvasController {
       return;
     }
 
-    // 2. Normal mode: Check for vertex handle grab
-    if (state.polygon.length > 0 && e.button === 0) {
+    // 2. Normal mode: Check for vertex handle grab (not while the boundary is locked)
+    if (state.polygon.length > 0 && e.button === 0 && !(state.isPolygonClosed && state.isPolygonLocked)) {
       const toleranceWorld = 12 / scale;
       const hitIndex = findClosestVertex(worldPos, state.polygon, toleranceWorld);
 
@@ -1521,7 +1531,7 @@ export class CanvasController {
     }
 
     // 4. Handle vertex handle hover detection
-    if (state.polygon.length > 0) {
+    if (state.polygon.length > 0 && !(state.isPolygonClosed && state.isPolygonLocked)) {
       const toleranceWorld = 12 / scale;
       const hitIndex = findClosestVertex(worldPos, state.polygon, toleranceWorld);
 
@@ -1731,14 +1741,14 @@ export class CanvasController {
       this.loupe = null;
       this.ctx.fillStyle = '#FFFCF6';
       this.ctx.fillRect(0, 0, width, height);
-      this.render({ ...state, viewport }, { transparent: true });
+      this.render({ ...state, viewport }, { transparent: true, print: true });
     } finally {
       Object.assign(this, saved);
     }
     return off;
   }
 
-  render(state, { transparent = false } = {}) {
+  render(state, { transparent = false, print = false } = {}) {
     const { ctx, width, height } = this;
     if (!ctx || !width || !height) return;
 
@@ -1759,7 +1769,7 @@ export class CanvasController {
     }
 
     // One label board for every layer, and one layer that colours the plan; the others draw outlines
-    const board = createLabelBoard();
+    const board = createLabelBoard(print ? 1.6 : 1);
     const scale = state.viewport.scale;
     const L = state.layers;
     const fillOwner = L.elements ? 'elements' : L.vithi ? 'vithi' : L.devtas45 ? 'devtas' : L.zones16 ? 'zones' : null;
@@ -1767,7 +1777,7 @@ export class CanvasController {
 
     // 5. 16 zones and the Five Elements view
     if (state.metrics.zones16) {
-      draw16Zones(ctx, state.metrics.zones16, scale, L, plot, state.elementStyle, board, fillOwner === 'zones');
+      draw16Zones(ctx, state.metrics.zones16, scale, L, plot, state.elementStyle, board, fillOwner === 'zones', print);
     }
 
     // 5b. Vithi Mandal rings (under the grid lines)

@@ -28,6 +28,7 @@ export const createInitialState = () => Object.freeze({
   }),
   polygon: Object.freeze([]), // array of { x, y } in world coordinates
   isPolygonClosed: false,
+  isPolygonLocked: false,     // a finished boundary is locked (no corner dragging) until Edit Polygon
   isDrawingPolygon: false,
   activeVertexIndex: null,
   draggingVertexIndex: null,
@@ -382,6 +383,8 @@ const restoreFrom = (state, snap) => {
   return {
     polygon: Object.freeze([...snap.polygon]),
     isPolygonClosed: snap.isPolygonClosed,
+    // A boundary that undo or redo closes again comes back locked; one already open for editing stays so
+    isPolygonLocked: snap.isPolygonClosed ? (state.isPolygonClosed ? state.isPolygonLocked : true) : false,
     rotation,
     calibration,
     metrics: recalculateMetrics(snap.polygon, snap.isPolygonClosed, rotation, state.gridAlign, state.mandalaShape)
@@ -418,6 +421,7 @@ export const closePolygon = () => (state) => {
   return {
     ...state,
     isPolygonClosed: true,
+    isPolygonLocked: true,
     isDrawingPolygon: false,
     cursorWorldPos: null,
     history: Object.freeze({
@@ -457,6 +461,12 @@ export const commitDragHistory = (dragStartSnapshot) => (state) => {
   };
 };
 
+// Edit Polygon (unlock) and Finish Polygon (lock) for a closed boundary
+export const setPolygonLocked = (locked) => (state) => {
+  if (!state.isPolygonClosed || state.isPolygonLocked === !!locked) return state;
+  return { ...state, isPolygonLocked: !!locked, hoverVertexIndex: null, draggingVertexIndex: null };
+};
+
 export const setHoverVertex = (index) => (state) => {
   if (state.hoverVertexIndex === index) return state;
   return {
@@ -485,6 +495,7 @@ export const setPolygonPoints = (points, isClosed = true) => (state) => {
     ...state,
     polygon: Object.freeze([...points]),
     isPolygonClosed: isClosed,
+    isPolygonLocked: isClosed,
     history: Object.freeze({
       past: Object.freeze(nextPast),
       future: Object.freeze([])
@@ -502,6 +513,7 @@ export const clearBoundary = () => (state) => {
     ...state,
     polygon: Object.freeze([]),
     isPolygonClosed: false,
+    isPolygonLocked: false,
     isDrawingPolygon: false,
     activeVertexIndex: null,
     draggingVertexIndex: null,
@@ -570,6 +582,8 @@ export const restoreProject = (saved) => (state) => {
   if (!saved) return state;
   const polygon = Object.freeze((saved.polygon || []).map((p) => ({ x: p.x, y: p.y })));
   const isPolygonClosed = !!saved.isPolygonClosed && polygon.length >= 3;
+  // Saved boundaries open locked unless they were being edited (older saves: locked)
+  const isPolygonLocked = isPolygonClosed && saved.isPolygonLocked !== false;
   // Saves from before version 2 stored North's clockwise angle; the plan itself must not change
   const savedRotation = saved.version === 1 ? -(Number(saved.rotation) || 0) : (Number(saved.rotation) || 0);
   const rotation = (savedRotation % 360 + 360) % 360;
@@ -589,6 +603,7 @@ export const restoreProject = (saved) => (state) => {
     ...state,
     polygon,
     isPolygonClosed,
+    isPolygonLocked,
     rotation,
     gridAlign,
     mandalaShape,

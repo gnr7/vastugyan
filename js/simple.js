@@ -20,6 +20,7 @@ import {
   applyCalibration,
   restoreProject,
   setChakraSize,
+  setPolygonLocked,
   setMandalaShape,
   setGridAlign,
   setElementStyle,
@@ -354,6 +355,11 @@ document.addEventListener('DOMContentLoaded', () => {
     drawnHere = true;
     store.setState(setDrawingMode(true));
   });
+  // Edit Polygon unlocks a finished boundary's corners; Finish Polygon locks them again
+  $('btnEditPoly').addEventListener('click', () => {
+    const state = store.getState();
+    store.setState(setPolygonLocked(!state.isPolygonLocked));
+  });
   $('btnFinish').addEventListener('click', () => {
     if (store.getState().polygon.length >= 3) store.setState(closePolygon());
   });
@@ -659,6 +665,13 @@ document.addEventListener('DOMContentLoaded', () => {
     $('btnDraw').classList.toggle('is-busy', drawing);
     $('btnDraw').title = drawing ? 'Stop marking the boundary' : 'Mark the outer corners of the plot';
     $('btnFinish').hidden = !drawing;
+    const editing = closed && !state.isPolygonLocked && !drawing;
+    $('btnEditPoly').hidden = !closed || drawing;
+    $('btnEditPolyLabel').textContent = editing ? 'Finish' : 'Edit';
+    $('btnEditPoly').classList.toggle('s-tbtn-green', editing);
+    $('btnEditPoly').classList.toggle('s-tbtn-light', !editing);
+    $('btnEditPoly').title = editing ? 'Finish Polygon: lock the boundary' : 'Edit Polygon: unlock the corners to adjust the boundary';
+    $('editHint').hidden = !editing;
     $('btnFinishLabel').textContent = `Finish (${corners})`;
     $('btnFinish').disabled = corners < 3;
     $('btnUndo').disabled = (state.history?.past?.length || 0) === 0;
@@ -756,7 +769,7 @@ document.addEventListener('DOMContentLoaded', () => {
     $('elementStyleNote').textContent = ELEMENT_STYLES[state.elementStyle].note;
     if (!$('elementsPanel').hidden) {
       const tatva = calculatePanchTatvaSummary(state.metrics.zones16, state.elementStyle);
-      const colours = { water: '#2C6FB7', air: '#3E8E5E', fire: '#C2412B', earth: '#B8862B', space: '#7D7590' };
+      const colours = { water: '#1F1F1F', air: '#8B5A2B', fire: '#F26B1D', earth: '#B8862B', space: '#FFFFFF' };
       $('elementRows').innerHTML = tatva.map((el) => `<div class="s-area-row"><span><i class="s-dot" style="background:${colours[el.id] || '#999'}"></i>${el.name} <small>${el.zones.join(', ')}</small></span><strong>${el.hasData ? el.formattedPercentage : '—'}</strong></div>`).join('');
       const earth = tatva.find((el) => el.id === 'earth');
       $('earthSplit').hidden = !(earth && earth.earthSplit && earth.hasData);

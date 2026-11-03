@@ -21,6 +21,7 @@ import {
   setMandalaShape,
   setElementStyle,
   setChakraSize,
+  setPolygonLocked,
   applyView,
   currentView,
   setLandDimensions,
@@ -433,12 +434,19 @@ document.addEventListener('DOMContentLoaded', () => {
   // 7. Draw Boundary Toggle Button
   btnDrawPolygon.addEventListener('click', () => {
     const state = store.getState();
+    // A finished boundary: Edit Polygon unlocks its corners, Finish Polygon locks them again
+    if (state.isPolygonClosed && !state.isDrawingPolygon) {
+      store.setState(setPolygonLocked(!state.isPolygonLocked));
+      return;
+    }
     const nextDrawing = !state.isDrawingPolygon;
     if (nextDrawing) {
       workspaceStarted = true;
     }
     store.setState(setDrawingMode(nextDrawing));
   });
+
+  document.getElementById('btnFinishEdit').addEventListener('click', () => store.setState(setPolygonLocked(true)));
 
   if (btnFinishDraft) {
     btnFinishDraft.addEventListener('click', () => {
@@ -577,7 +585,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Sync Drawing Mode Button & Banner
     btnDrawPolygon.classList.toggle('active', state.isDrawingPolygon);
-    btnDrawPolygon.querySelector('.dock-label').textContent = state.isDrawingPolygon ? 'Done' : 'Draw';
+    const editingBoundary = state.isPolygonClosed && !state.isPolygonLocked && !state.isDrawingPolygon;
+    btnDrawPolygon.querySelector('.dock-label').textContent = state.isDrawingPolygon ? 'Done'
+      : state.isPolygonClosed ? (state.isPolygonLocked ? 'Edit' : 'Finish') : 'Draw';
+    btnDrawPolygon.title = state.isPolygonClosed && !state.isDrawingPolygon
+      ? (state.isPolygonLocked ? 'Edit Polygon: unlock the corners to adjust the boundary' : 'Finish Polygon: lock the boundary')
+      : 'Trace the plot boundary';
+    btnDrawPolygon.classList.toggle('is-current', editingBoundary);
+    document.getElementById('editBanner').style.display = editingBoundary ? 'flex' : 'none';
     if (draftingBanner) draftingBanner.style.display = state.isDrawingPolygon ? 'flex' : 'none';
 
     // Shell: compass dials, sheet out of the way while a tool is active

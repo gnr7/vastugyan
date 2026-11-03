@@ -117,6 +117,7 @@
           <div class="s-toolbar">
             <div class="s-tools s-tools-draw">
               <button type="button" class="s-tbtn s-tbtn-blue s-tbtn-main" id="btnDraw"><svg class="s-icon"><use href="#s-pen"/></svg><span id="btnDrawLabel">Draw Polygon</span></button>
+              <button type="button" class="s-tbtn s-tbtn-light" id="btnEditPoly" hidden title="Unlock the corners to adjust the boundary"><svg class="s-icon"><use href="#s-pen"/></svg><span id="btnEditPolyLabel">Edit</span><span class="s-wide-only">&nbsp;Polygon</span></button>
               <button type="button" class="s-tbtn s-tbtn-green" id="btnFinish" hidden><svg class="s-icon"><use href="#s-check"/></svg><span id="btnFinishLabel">Finish</span></button>
               <button type="button" class="s-tbtn s-tbtn-light s-tbtn-icon" id="btnUndo" title="Undo (Ctrl+Z)" aria-label="Undo"><svg class="s-icon"><use href="#s-undo"/></svg></button>
               <button type="button" class="s-tbtn s-tbtn-light s-tbtn-icon" id="btnRedo" title="Redo (Ctrl+Y)" aria-label="Redo"><svg class="s-icon"><use href="#s-redo"/></svg></button>
@@ -164,6 +165,9 @@
             <span class="only-touch">Press and lift on each outer corner, in order around the plot. </span>
             <span class="only-mouse">Click each outer corner, in order around the plot. </span>
             When every corner is placed, press <strong>Finish</strong>.
+          </div>
+          <div class="s-hint" id="editHint" hidden>
+            <strong>Editing the boundary.</strong> Drag any corner into place, then press <strong>Finish Polygon</strong>.
           </div>
           <div class="s-hint" id="scaleHint" hidden>
             <strong>Setting the scale.</strong> Tap both ends of one wall whose real length you know.
