@@ -577,13 +577,13 @@ export const draw45Devtas = (ctx, devtaFields, scale, layers, angleDeg = 0, boar
 
 // Render 16 Directional Zones (22.5° rays, sector fills, directional badges)
 const ELEMENT_STYLE = {
-  Water: { color: '#1F1F1F', fill: 'rgba(31, 31, 31, 0.20)', label: 'Water' },
-  Air: { color: '#8B5A2B', fill: 'rgba(139, 90, 43, 0.24)', label: 'Air' },
-  Fire: { color: '#E8590C', fill: 'rgba(242, 107, 29, 0.26)', label: 'Fire' },
-  Earth: { color: '#B8862B', fill: 'rgba(184, 134, 43, 0.24)', label: 'Earth' },
-  Space: { color: '#4A4A4A', fill: 'rgba(255, 255, 255, 0.62)', label: 'Space' }, // white area, dark label
-  HardEarth: { color: '#A87A12', fill: 'rgba(222, 178, 40, 0.30)', label: 'Hard earth' },
-  LooseEarth: { color: '#97804A', fill: 'rgba(238, 220, 160, 0.42)', label: 'Loose earth' }
+  Water: { color: '#1F1F1F', line: '#1F1F1F', fill: 'rgba(31, 31, 31, 0.20)', label: 'Water' },
+  Air: { color: '#8B5A2B', line: '#8B5A2B', fill: 'rgba(139, 90, 43, 0.24)', label: 'Air' },
+  Fire: { color: '#E8590C', line: '#F26B1D', fill: 'rgba(242, 107, 29, 0.26)', label: 'Fire' },
+  Earth: { color: '#A88400', line: '#E8B800', fill: 'rgba(255, 204, 0, 0.36)', label: 'Earth' }, // true yellow
+  Space: { color: '#4A4A4A', line: '#9A9A9A', fill: 'rgba(255, 255, 255, 0.62)', label: 'Space' }, // white area, grey edge, dark label
+  HardEarth: { color: '#A87A12', line: '#D9A400', fill: 'rgba(222, 178, 40, 0.30)', label: 'Hard earth' },
+  LooseEarth: { color: '#97804A', line: '#B8A060', fill: 'rgba(238, 220, 160, 0.42)', label: 'Loose earth' }
 };
 
 // Render the 16 directional zones and/or the Five Elements view.
@@ -629,14 +629,47 @@ export const draw16Zones = (ctx, zones16, scale, layers, plot = null, style = 'c
     });
   }
 
-  // Rays: every zone boundary for 16 zones; only element boundaries for the Five Elements view
+  // Five Elements: each element's area outlined in its own colour, along both edges and its walls.
+  // Every outline is clipped to its own area, so a shared edge shows both colours side by side.
+  if (layers.elements) {
+    const groups = [];
+    zones.forEach((z) => {
+      const last = groups[groups.length - 1];
+      if (last && last.tone === toneOf(z)) last.zones.push(z);
+      else groups.push({ tone: toneOf(z), zones: [z] });
+    });
+    if (groups.length > 1 && groups[0].tone === groups[groups.length - 1].tone) {
+      groups[0].zones = groups.pop().zones.concat(groups[0].zones);
+    }
+    groups.forEach((g) => {
+      const a0 = g.zones[0].startRad;
+      const a1 = g.zones[g.zones.length - 1].endRad;
+      ctx.save();
+      wedge(a0, a1);
+      ctx.clip();
+      ctx.beginPath();
+      if (closed) tracePolygon(ctx, plot);
+      else ctx.arc(centroid.x, centroid.y, radius, 0, Math.PI * 2);
+      [a0, a1].forEach((a) => {
+        ctx.moveTo(centroid.x, centroid.y);
+        ctx.lineTo(centroid.x + Math.cos(a) * reach, centroid.y + Math.sin(a) * reach);
+      });
+      ctx.strokeStyle = ELEMENT_STYLE[g.tone].line || ELEMENT_STYLE[g.tone].color;
+      ctx.lineWidth = (print ? 5 : 3.4) / scale; // half of it is clipped away at each edge
+      ctx.setLineDash([]);
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  // Rays: every zone boundary, dotted, when 16 Zones is on
   ctx.beginPath();
-  zones.forEach((z, i) => {
-    const prev = zones[(i + zones.length - 1) % zones.length];
-    if (!layers.zones16 && toneOf(prev) === toneOf(z)) return;
-    ctx.moveTo(centroid.x, centroid.y);
-    ctx.lineTo(centroid.x + Math.cos(z.startRad) * reach, centroid.y + Math.sin(z.startRad) * reach);
-  });
+  if (layers.zones16) {
+    zones.forEach((z) => {
+      ctx.moveTo(centroid.x, centroid.y);
+      ctx.lineTo(centroid.x + Math.cos(z.startRad) * reach, centroid.y + Math.sin(z.startRad) * reach);
+    });
+  }
   // On screen a light dotted line; on paper (PNG / PDF) a bold, near-black dashed line so it survives printing
   if (print) {
     ctx.strokeStyle = 'rgba(20, 15, 10, 0.92)';
@@ -711,7 +744,7 @@ const WHEEL_STYLE = {
   Water: { fill: '#1F1F1F', text: '#FFFFFF' },
   Air: { fill: '#8B5A2B', text: '#FFFFFF' },
   Fire: { fill: '#F26B1D', text: '#FFFFFF' },
-  Earth: { fill: '#D7A531', text: '#3A2A10' },
+  Earth: { fill: '#FFCC00', text: '#3A2A10' },
   HardEarth: { fill: '#E6C02E', text: '#3A2A10' },
   LooseEarth: { fill: '#F4EAC0', text: '#5A4520' },
   Space: { fill: '#FFFFFF', text: '#2A1F17', seam: '#9A9A9A' } // white needs a visible edge

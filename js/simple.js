@@ -769,7 +769,7 @@ document.addEventListener('DOMContentLoaded', () => {
     $('elementStyleNote').textContent = ELEMENT_STYLES[state.elementStyle].note;
     if (!$('elementsPanel').hidden) {
       const tatva = calculatePanchTatvaSummary(state.metrics.zones16, state.elementStyle);
-      const colours = { water: '#1F1F1F', air: '#8B5A2B', fire: '#F26B1D', earth: '#B8862B', space: '#FFFFFF' };
+      const colours = { water: '#1F1F1F', air: '#8B5A2B', fire: '#F26B1D', earth: '#FFCC00', space: '#FFFFFF' };
       $('elementRows').innerHTML = tatva.map((el) => `<div class="s-area-row"><span><i class="s-dot" style="background:${colours[el.id] || '#999'}"></i>${el.name} <small>${el.zones.join(', ')}</small></span><strong>${el.hasData ? el.formattedPercentage : '—'}</strong></div>`).join('');
       const earth = tatva.find((el) => el.id === 'earth');
       $('earthSplit').hidden = !(earth && earth.earthSplit && earth.hasData);

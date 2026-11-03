@@ -65,8 +65,8 @@ export const PANCH_TATVA_DATA = [
     id: 'earth',
     name: 'Earth (Prithvi)',
     sanskrit: 'पृथ्वी तत्व',
-    color: '#B8862B',
-    bgTint: 'rgba(184, 134, 43, 0.12)',
+    color: '#FFCC00',
+    bgTint: 'rgba(255, 204, 0, 0.16)',
     zones: zonesOfElement('earth'),
     significance: 'Stability, family bonds, skills & relationships',
     directionRange: 'South-South-West to South-West'
